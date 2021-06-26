@@ -8,7 +8,10 @@ Ruby DSL to BPF CO-RE tools
 Rucy.build do |prog|
   prog.license "GPL"
   prog.section "cgroup/dev"
-  prog.arg_type ["struct bpf_cgroup_dev_ctx"]
+  prog.args    [
+    "struct bpf_cgroup_dev_ctx",
+    [:u32, "access_type"], [:u32, "major"], [:u32, "minor"]
+  ]
   prog.function do |ctx|
     if ctx.major == 1 && ctx.minor == 0
       return 0
