@@ -6,7 +6,7 @@ Ruby DSL to BPF CO-RE tools
 
 ```ruby
 Rucy.build do |prog|
-  prog.licese "GPL"
+  prog.license "GPL"
   prog.section "cgroup/dev"
   prog.arg_type ["struct bpf_cgroup_dev_ctx"]
   prog.function do |ctx|
