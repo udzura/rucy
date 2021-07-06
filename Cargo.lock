@@ -39,6 +39,7 @@ checksum = "12b8adadd720df158f4d70dfe7ccc6adb0472d7c55ca83445f6a5ab3e36f8fb6"
 [[package]]
 name = "mrusty"
 version = "3.0.0"
+source = "git+https://github.com/udzura/mrusty.git#9fea9dae0ec906f8f90d01e97dc20147fcd27024"
 dependencies = [
  "gcc",
  "tar",
