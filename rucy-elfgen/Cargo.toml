@@ -1,14 +1,12 @@
 [package]
-name = "rucy"
+name = "rucy-elfgen"
 version = "0.1.0"
 authors = ["Uchio Kondo <udzura@udzura.jp>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[workspace]
-members = [
-    "rucy-mruby-prelude",
-    "rucy-libelf-sys",
-    "rucy-elfgen",
-]
+[dependencies]
+rucy-mruby-prelude = { path = "../rucy-mruby-prelude" }
+rucy-libelf-sys = { path = "../rucy-libelf-sys" }
+errno = "0.2.7"
