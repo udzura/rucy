@@ -33,6 +33,7 @@ mod models {
     #[derive(Debug, Clone)]
     #[non_exhaustive]
     pub struct Section {
+        pub r#type: SectionType,
         pub header: SectionHeader,
         pub data: SectionHeaderData,
     }
@@ -62,7 +63,20 @@ mod models {
         pub name_idx: u32,
         pub shndx: u16,
     }
+
+    #[derive(Debug, Copy, Clone)]
+    #[non_exhaustive]
+    #[allow(dead_code)]
+    pub enum SectionType {
+        Null,
+        StrTab,
+        Prog,
+        License,
+        SymTab,
+    }
 }
+
+const DUMMY_BPF_PROG: &[u8] = b"\xb7\x00\x00\x00\x01\x00\x00\x00\x95\x00\x00\x00\x00\x00\x00\x00";
 
 pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>> {
     let mut source = models::Elf {
@@ -74,6 +88,7 @@ pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>
         phdr: None,
         scns: vec![
             models::Section {
+                r#type: models::SectionType::StrTab,
                 header: models::SectionHeader {
                     name: ".strtab".to_string(),
                     name_idx: 0,
@@ -84,6 +99,18 @@ pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>
                 data: models::SectionHeaderData::Unset,
             },
             models::Section {
+                r#type: models::SectionType::License,
+                header: models::SectionHeader {
+                    name: "license".to_string(),
+                    name_idx: 0,
+                    r#type: SHT_PROGBITS,
+                    flags: (SHF_ALLOC | SHF_WRITE) as u64,
+                    align: 1,
+                },
+                data: models::SectionHeaderData::Data(b"GPL\0".to_vec()),
+            },
+            models::Section {
+                r#type: models::SectionType::License,
                 header: models::SectionHeader {
                     name: "license".to_string(),
                     name_idx: 0,
@@ -133,9 +160,10 @@ pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>
             let sh = elf64_getshdr(scn_);
             let data_ = elf_newdata(scn_);
 
-            let ty = scn.header.r#type;
+            use models::SectionType;
+            let ty = scn.r#type;
             match ty {
-                SHT_STRTAB => {
+                SectionType::StrTab => {
                     let mut buf = vec![0u8; strtab.len()].into_boxed_slice();
                     buf.copy_from_slice(strtab.as_bytes());
                     let len = buf.len() as u64;
@@ -149,9 +177,8 @@ pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>
                     (*sh).sh_addralign = scn.header.align;
                     (*sh).sh_flags = scn.header.flags;
                     (*sh).sh_name = scn.header.name_idx;
-                    eprintln!("{:?}", (*sh).sh_name);
                 }
-                SHT_PROGBITS => {
+                SectionType::License => {
                     if let models::SectionHeaderData::Data(data) = &scn.data {
                         let mut buf = vec![0u8; data.len()].into_boxed_slice();
                         buf.copy_from_slice(data);
@@ -166,11 +193,10 @@ pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>
                         (*sh).sh_addralign = scn.header.align;
                         (*sh).sh_flags = scn.header.flags;
                         (*sh).sh_name = scn.header.name_idx;
-                        eprintln!("{:?}", (*sh).sh_name);
                     }
                 }
                 _ => {
-                    panic!("unsupported: {}", ty);
+                    panic!("unsupported: {:?}", ty);
                 }
             }
 
