@@ -120,6 +120,17 @@ pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>
                 },
                 data: models::SectionHeaderData::Data(b"GPL\0".to_vec()),
             },
+            models::Section {
+                r#type: models::SectionType::Prog,
+                header: models::SectionHeader {
+                    name: "cgroup/dev".to_string(),
+                    name_idx: 0,
+                    r#type: SHT_PROGBITS,
+                    flags: (SHF_ALLOC | SHF_EXECINSTR) as u64,
+                    align: 8,
+                },
+                data: models::SectionHeaderData::Data(DUMMY_BPF_PROG.to_vec()),
+            },
         ],
     };
 
@@ -169,36 +180,35 @@ pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>
                     let len = buf.len() as u64;
                     (*data_).d_buf = Box::into_raw(buf) as *mut c_void;
                     (*data_).d_size = len;
-                    (*data_).d_align = 1;
+                    (*data_).d_align = scn.header.align;
 
                     (*sh).sh_size = len;
                     (*sh).sh_entsize = 0;
-                    (*sh).sh_type = scn.header.r#type;
-                    (*sh).sh_addralign = scn.header.align;
-                    (*sh).sh_flags = scn.header.flags;
-                    (*sh).sh_name = scn.header.name_idx;
                 }
-                SectionType::License => {
+                SectionType::License | SectionType::Prog => {
                     if let models::SectionHeaderData::Data(data) = &scn.data {
                         let mut buf = vec![0u8; data.len()].into_boxed_slice();
                         buf.copy_from_slice(data);
                         let len = buf.len() as u64;
                         (*data_).d_buf = Box::into_raw(buf) as *mut c_void;
                         (*data_).d_size = len;
-                        (*data_).d_align = 1;
+                        (*data_).d_align = scn.header.align;
 
                         (*sh).sh_size = len;
                         (*sh).sh_entsize = 0;
-                        (*sh).sh_type = scn.header.r#type;
-                        (*sh).sh_addralign = scn.header.align;
-                        (*sh).sh_flags = scn.header.flags;
-                        (*sh).sh_name = scn.header.name_idx;
+                    } else {
+                        panic!("invalid data: {:?}", scn.data);
                     }
                 }
                 _ => {
                     panic!("unsupported: {:?}", ty);
                 }
             }
+
+            (*sh).sh_type = scn.header.r#type;
+            (*sh).sh_addralign = scn.header.align;
+            (*sh).sh_flags = scn.header.flags;
+            (*sh).sh_name = scn.header.name_idx;
 
             if gelf_update_shdr(scn_, sh) == 0 {
                 return Err(Box::new(errno()));
