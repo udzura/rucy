@@ -67,7 +67,7 @@ mod models {
         pub value: u64,
     }
 
-    #[derive(Debug, Copy, Clone)]
+    #[derive(Debug, Copy, Clone, Eq, PartialEq)]
     #[non_exhaustive]
     #[allow(dead_code)]
     pub enum SectionType {
@@ -188,6 +188,19 @@ pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>
             scn.header.name_idx = (strtab.len()) as u32;
             strtab.push_str(&scn.header.name);
             strtab.push('\0');
+        }
+
+        let mut symbol = source
+            .scns
+            .iter_mut()
+            .find(|&x| x.r#type == models::SectionType::SymTab)
+            .unwrap();
+        if let models::SectionHeaderData::SymTab(mut symbols) = &(symbol.data) {
+            for sym in symbols.iter_mut() {
+                sym.name_idx = (strtab.len()) as u32;
+                strtab.push_str(&sym.name);
+                strtab.push('\0');
+            }
         }
 
         for scn in source.scns.iter_mut() {
