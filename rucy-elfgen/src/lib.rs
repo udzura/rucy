@@ -46,6 +46,7 @@ mod models {
         pub r#type: u32,
         pub flags: u64,
         pub align: u64,
+        pub link: u64,
     }
 
     #[derive(Debug, Clone)]
@@ -61,7 +62,9 @@ mod models {
     pub struct Symbol {
         pub name: String,
         pub name_idx: u32,
+        pub info: u64,
         pub shndx: u16,
+        pub value: u64,
     }
 
     #[derive(Debug, Copy, Clone)]
@@ -79,6 +82,23 @@ mod models {
 const DUMMY_BPF_PROG: &[u8] = b"\xb7\x00\x00\x00\x01\x00\x00\x00\x95\x00\x00\x00\x00\x00\x00\x00";
 
 pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>> {
+    let mut symbols = vec![
+        models::Symbol {
+            name: "_license".to_string(),
+            name_idx: 0,
+            shndx: 2,
+            info: ((STB_GLOBAL << 4) | STT_OBJECT) as u64,
+            value: 0,
+        },
+        models::Symbol {
+            name: "my_prog_1".to_string(),
+            name_idx: 0,
+            shndx: 3,
+            info: ((STB_GLOBAL << 4) | STT_FUNC) as u64,
+            value: 0,
+        },
+    ];
+
     let mut source = models::Elf {
         ehdr: models::ElfHeader {
             r#type: ET_REL as u16,
@@ -95,6 +115,7 @@ pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>
                     r#type: SHT_STRTAB,
                     flags: 0,
                     align: 1,
+                    link: 0,
                 },
                 data: models::SectionHeaderData::Unset,
             },
@@ -106,17 +127,7 @@ pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>
                     r#type: SHT_PROGBITS,
                     flags: (SHF_ALLOC | SHF_WRITE) as u64,
                     align: 1,
-                },
-                data: models::SectionHeaderData::Data(b"GPL\0".to_vec()),
-            },
-            models::Section {
-                r#type: models::SectionType::License,
-                header: models::SectionHeader {
-                    name: "license".to_string(),
-                    name_idx: 0,
-                    r#type: SHT_PROGBITS,
-                    flags: (SHF_ALLOC | SHF_WRITE) as u64,
-                    align: 1,
+                    link: 0,
                 },
                 data: models::SectionHeaderData::Data(b"GPL\0".to_vec()),
             },
@@ -128,8 +139,21 @@ pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>
                     r#type: SHT_PROGBITS,
                     flags: (SHF_ALLOC | SHF_EXECINSTR) as u64,
                     align: 8,
+                    link: 0,
                 },
                 data: models::SectionHeaderData::Data(DUMMY_BPF_PROG.to_vec()),
+            },
+            models::Section {
+                r#type: models::SectionType::SymTab,
+                header: models::SectionHeader {
+                    name: ".symtab".to_string(),
+                    name_idx: 0,
+                    r#type: SHT_SYMTAB,
+                    flags: 0,
+                    align: 8,
+                    link: 1,
+                },
+                data: models::SectionHeaderData::SymTab(symbols),
             },
         ],
     };
