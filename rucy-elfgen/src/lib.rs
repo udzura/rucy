@@ -9,6 +9,8 @@ use errno::errno;
 use std::path::Path;
 
 mod models {
+    use std::collections::HashMap;
+
     #[derive(Debug, Clone)]
     pub struct Elf {
         pub ehdr: ElfHeader,
@@ -42,7 +44,6 @@ mod models {
     #[non_exhaustive]
     pub struct SectionHeader {
         pub name: String,
-        pub name_idx: u32,
         pub r#type: u32,
         pub flags: u64,
         pub align: u64,
@@ -61,10 +62,15 @@ mod models {
     #[non_exhaustive]
     pub struct Symbol {
         pub name: String,
-        pub name_idx: u32,
         pub info: u64,
         pub shndx: u16,
         pub value: u64,
+    }
+
+    #[derive(Debug, Clone, Default)]
+    pub struct StringTable {
+        pub table: String,
+        pub index_cache: HashMap<String, u32>,
     }
 
     #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -82,24 +88,24 @@ mod models {
 const DUMMY_BPF_PROG: &[u8] = b"\xb7\x00\x00\x00\x01\x00\x00\x00\x95\x00\x00\x00\x00\x00\x00\x00";
 
 pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut symbols = vec![
+    let mut table = models::StringTable::default();
+
+    let symbols = vec![
         models::Symbol {
             name: "_license".to_string(),
-            name_idx: 0,
             shndx: 2,
             info: ((STB_GLOBAL << 4) | STT_OBJECT) as u64,
             value: 0,
         },
         models::Symbol {
             name: "my_prog_1".to_string(),
-            name_idx: 0,
             shndx: 3,
             info: ((STB_GLOBAL << 4) | STT_FUNC) as u64,
             value: 0,
         },
     ];
 
-    let mut source = models::Elf {
+    let source = models::Elf {
         ehdr: models::ElfHeader {
             r#type: ET_REL as u16,
             machine: EM_BPF as u16,
@@ -111,7 +117,6 @@ pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>
                 r#type: models::SectionType::StrTab,
                 header: models::SectionHeader {
                     name: ".strtab".to_string(),
-                    name_idx: 0,
                     r#type: SHT_STRTAB,
                     flags: 0,
                     align: 1,
@@ -123,7 +128,6 @@ pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>
                 r#type: models::SectionType::License,
                 header: models::SectionHeader {
                     name: "license".to_string(),
-                    name_idx: 0,
                     r#type: SHT_PROGBITS,
                     flags: (SHF_ALLOC | SHF_WRITE) as u64,
                     align: 1,
@@ -135,7 +139,6 @@ pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>
                 r#type: models::SectionType::Prog,
                 header: models::SectionHeader {
                     name: "cgroup/dev".to_string(),
-                    name_idx: 0,
                     r#type: SHT_PROGBITS,
                     flags: (SHF_ALLOC | SHF_EXECINSTR) as u64,
                     align: 8,
@@ -147,7 +150,6 @@ pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>
                 r#type: models::SectionType::SymTab,
                 header: models::SectionHeader {
                     name: ".symtab".to_string(),
-                    name_idx: 0,
                     r#type: SHT_SYMTAB,
                     flags: 0,
                     align: 8,
@@ -157,6 +159,31 @@ pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>
             },
         ],
     };
+
+    table.table.push('\0');
+
+    for scn in source.scns.iter() {
+        table
+            .index_cache
+            .insert(scn.header.name.to_owned(), table.table.len() as u32);
+        table.table.push_str(&scn.header.name);
+        table.table.push('\0');
+    }
+
+    let symbol = source
+        .scns
+        .iter()
+        .find(|&x| x.r#type == models::SectionType::SymTab)
+        .unwrap();
+    if let models::SectionHeaderData::SymTab(symbols) = symbol.data.clone() {
+        for sym in symbols.iter() {
+            table
+                .index_cache
+                .insert(sym.name.to_owned(), table.table.len() as u32);
+            table.table.push_str(&sym.name);
+            table.table.push('\0');
+        }
+    }
 
     unsafe {
         elf_version(EV_CURRENT);
@@ -181,29 +208,7 @@ pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>
 
         // skip phdr
 
-        let mut strtab = String::new();
-        strtab.push('\0');
-
-        for scn in source.scns.iter_mut() {
-            scn.header.name_idx = (strtab.len()) as u32;
-            strtab.push_str(&scn.header.name);
-            strtab.push('\0');
-        }
-
-        let mut symbol = source
-            .scns
-            .iter_mut()
-            .find(|&x| x.r#type == models::SectionType::SymTab)
-            .unwrap();
-        if let models::SectionHeaderData::SymTab(mut symbols) = &(symbol.data) {
-            for sym in symbols.iter_mut() {
-                sym.name_idx = (strtab.len()) as u32;
-                strtab.push_str(&sym.name);
-                strtab.push('\0');
-            }
-        }
-
-        for scn in source.scns.iter_mut() {
+        for scn in source.scns.iter() {
             let scn_ = elf_newscn(elf);
             let sh = elf64_getshdr(scn_);
             let data_ = elf_newdata(scn_);
@@ -212,8 +217,8 @@ pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>
             let ty = scn.r#type;
             match ty {
                 SectionType::StrTab => {
-                    let mut buf = vec![0u8; strtab.len()].into_boxed_slice();
-                    buf.copy_from_slice(strtab.as_bytes());
+                    let mut buf = vec![0u8; table.table.len()].into_boxed_slice();
+                    buf.copy_from_slice(table.table.as_bytes());
                     let len = buf.len() as u64;
                     (*data_).d_buf = Box::into_raw(buf) as *mut c_void;
                     (*data_).d_size = len;
@@ -245,7 +250,7 @@ pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>
             (*sh).sh_type = scn.header.r#type;
             (*sh).sh_addralign = scn.header.align;
             (*sh).sh_flags = scn.header.flags;
-            (*sh).sh_name = scn.header.name_idx;
+            (*sh).sh_name = *table.index_cache.get(&scn.header.name).unwrap_or(&0u32);
 
             if gelf_update_shdr(scn_, sh) == 0 {
                 return Err(Box::new(errno()));
