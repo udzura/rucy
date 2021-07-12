@@ -8,7 +8,7 @@ use errno::errno;
 //use std::mem::MaybeUninit;
 use std::path::Path;
 
-mod models {
+pub mod models {
     use std::collections::HashMap;
 
     #[derive(Debug, Clone)]
@@ -18,8 +18,39 @@ mod models {
         pub scns: Vec<Section>,
     }
 
+    impl Elf {
+        pub fn generate_strtab_data(&self) -> StringTable {
+            let mut table = StringTable::default();
+            table.table.push('\0');
+
+            for scn in self.scns.iter() {
+                table
+                    .index_cache
+                    .insert(scn.header.name.to_owned(), table.table.len() as u32);
+                table.table.push_str(&scn.header.name);
+                table.table.push('\0');
+            }
+
+            let symbol = self
+                .scns
+                .iter()
+                .find(|&x| x.r#type == SectionType::SymTab)
+                .unwrap();
+            if let SectionHeaderData::SymTab(symbols) = symbol.data.clone() {
+                for sym in symbols.iter() {
+                    table
+                        .index_cache
+                        .insert(sym.name.to_owned(), table.table.len() as u32);
+                    table.table.push_str(&sym.name);
+                    table.table.push('\0');
+                }
+            }
+
+            table
+        }
+    }
+
     #[derive(Debug, Clone)]
-    #[non_exhaustive]
     pub struct ElfHeader {
         pub r#type: u16,
         pub machine: u16,
@@ -27,13 +58,11 @@ mod models {
     }
 
     #[derive(Debug, Clone)]
-    #[non_exhaustive]
     pub struct ProgHeader {
         // TBA
     }
 
     #[derive(Debug, Clone)]
-    #[non_exhaustive]
     pub struct Section {
         pub r#type: SectionType,
         pub header: SectionHeader,
@@ -41,13 +70,13 @@ mod models {
     }
 
     #[derive(Debug, Clone)]
-    #[non_exhaustive]
     pub struct SectionHeader {
         pub name: String,
         pub r#type: u32,
         pub flags: u64,
         pub align: u64,
-        pub link: u64,
+        pub link: u32,
+        pub info: u32,
     }
 
     #[derive(Debug, Clone)]
@@ -59,12 +88,12 @@ mod models {
     }
 
     #[derive(Debug, Clone)]
-    #[non_exhaustive]
     pub struct Symbol {
         pub name: String,
-        pub info: u64,
+        pub info: u8,
         pub shndx: u16,
         pub value: u64,
+        pub size: u64,
     }
 
     #[derive(Debug, Clone, Default)]
@@ -85,108 +114,14 @@ mod models {
     }
 }
 
-const DUMMY_BPF_PROG: &[u8] = b"\xb7\x00\x00\x00\x01\x00\x00\x00\x95\x00\x00\x00\x00\x00\x00\x00";
-
-pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>> {
-    let mut table = models::StringTable::default();
-
-    let symbols = vec![
-        models::Symbol {
-            name: "_license".to_string(),
-            shndx: 2,
-            info: ((STB_GLOBAL << 4) | STT_OBJECT) as u64,
-            value: 0,
-        },
-        models::Symbol {
-            name: "my_prog_1".to_string(),
-            shndx: 3,
-            info: ((STB_GLOBAL << 4) | STT_FUNC) as u64,
-            value: 0,
-        },
-    ];
-
-    let source = models::Elf {
-        ehdr: models::ElfHeader {
-            r#type: ET_REL as u16,
-            machine: EM_BPF as u16,
-            shstridx: 1,
-        },
-        phdr: None,
-        scns: vec![
-            models::Section {
-                r#type: models::SectionType::StrTab,
-                header: models::SectionHeader {
-                    name: ".strtab".to_string(),
-                    r#type: SHT_STRTAB,
-                    flags: 0,
-                    align: 1,
-                    link: 0,
-                },
-                data: models::SectionHeaderData::Unset,
-            },
-            models::Section {
-                r#type: models::SectionType::License,
-                header: models::SectionHeader {
-                    name: "license".to_string(),
-                    r#type: SHT_PROGBITS,
-                    flags: (SHF_ALLOC | SHF_WRITE) as u64,
-                    align: 1,
-                    link: 0,
-                },
-                data: models::SectionHeaderData::Data(b"GPL\0".to_vec()),
-            },
-            models::Section {
-                r#type: models::SectionType::Prog,
-                header: models::SectionHeader {
-                    name: "cgroup/dev".to_string(),
-                    r#type: SHT_PROGBITS,
-                    flags: (SHF_ALLOC | SHF_EXECINSTR) as u64,
-                    align: 8,
-                    link: 0,
-                },
-                data: models::SectionHeaderData::Data(DUMMY_BPF_PROG.to_vec()),
-            },
-            models::Section {
-                r#type: models::SectionType::SymTab,
-                header: models::SectionHeader {
-                    name: ".symtab".to_string(),
-                    r#type: SHT_SYMTAB,
-                    flags: 0,
-                    align: 8,
-                    link: 1,
-                },
-                data: models::SectionHeaderData::SymTab(symbols),
-            },
-        ],
-    };
-
-    table.table.push('\0');
-
-    for scn in source.scns.iter() {
-        table
-            .index_cache
-            .insert(scn.header.name.to_owned(), table.table.len() as u32);
-        table.table.push_str(&scn.header.name);
-        table.table.push('\0');
-    }
-
-    let symbol = source
-        .scns
-        .iter()
-        .find(|&x| x.r#type == models::SectionType::SymTab)
-        .unwrap();
-    if let models::SectionHeaderData::SymTab(symbols) = symbol.data.clone() {
-        for sym in symbols.iter() {
-            table
-                .index_cache
-                .insert(sym.name.to_owned(), table.table.len() as u32);
-            table.table.push_str(&sym.name);
-            table.table.push('\0');
-        }
-    }
+pub fn generate(
+    path: impl AsRef<Path>,
+    source: models::Elf,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let table = source.generate_strtab_data();
 
     unsafe {
-        elf_version(EV_CURRENT);
+        elf_version(consts::EV_CURRENT);
         let file = File::create(path)?;
         let elf = elf_begin(
             file.into_raw_fd(),
@@ -242,6 +177,43 @@ pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>
                         panic!("invalid data: {:?}", scn.data);
                     }
                 }
+                SectionType::SymTab => {
+                    if let models::SectionHeaderData::SymTab(data) = &scn.data {
+                        let entsize = ::std::mem::size_of::<Elf64_Sym>();
+                        let mut buf = vec![
+                            Elf64_Sym {
+                                st_name: 0,
+                                st_info: 0,
+                                st_other: 0,
+                                st_shndx: 0,
+                                st_value: 0,
+                                st_size: 0,
+                            };
+                            data.len() + 1
+                        ]
+                        .into_boxed_slice();
+
+                        for (i, sym) in data.iter().enumerate() {
+                            let idx = i + 1;
+                            buf[idx].st_name = *table.index_cache.get(&sym.name).unwrap_or(&0u32);
+                            buf[idx].st_info = sym.info;
+                            buf[idx].st_other = 0;
+                            buf[idx].st_shndx = sym.shndx;
+                            buf[idx].st_value = sym.value;
+                            buf[idx].st_size = sym.size;
+                        }
+
+                        let len = (entsize * (data.len() + 1)) as u64;
+                        (*data_).d_buf = Box::into_raw(buf) as *mut c_void;
+                        (*data_).d_size = len;
+                        (*data_).d_align = scn.header.align;
+
+                        (*sh).sh_size = len;
+                        (*sh).sh_link = scn.header.link;
+                        (*sh).sh_info = scn.header.info;
+                        (*sh).sh_entsize = entsize as u64;
+                    }
+                }
                 _ => {
                     panic!("unsupported: {:?}", ty);
                 }
@@ -265,6 +237,6 @@ pub fn generate(path: impl AsRef<Path>) -> Result<(), Box<dyn std::error::Error>
             return Err(Box::new(errno()));
         }
     }
-    println!("¡Hola!");
+    println!("Successful");
     Ok(())
 }
