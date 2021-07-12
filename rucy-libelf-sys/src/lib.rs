@@ -3,3 +3,7 @@
 #![allow(non_snake_case)]
 
 include!("../bindgen/bindings.rs");
+
+pub mod consts {
+    include!("../bindgen/bindings_consts.rs");
+}
