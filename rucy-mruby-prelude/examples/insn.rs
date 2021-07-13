@@ -12,5 +12,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     rucy_mruby_prelude::display_insn(include_str!("proc.rb"))?;
 
+    println!("Ruby Code:\n{}", include_str!("proc2.rb"));
+
+    rucy_mruby_prelude::display_insn(include_str!("proc2.rb"))?;
+
     Ok(())
 }
