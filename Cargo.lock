@@ -299,6 +299,7 @@ name = "rucy-elfgen"
 version = "0.1.0"
 dependencies = [
  "errno",
+ "mrusty",
  "rucy-libelf-sys",
  "rucy-mruby-prelude",
 ]

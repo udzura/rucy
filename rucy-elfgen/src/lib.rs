@@ -8,6 +8,8 @@ use errno::errno;
 //use std::mem::MaybeUninit;
 use std::path::Path;
 
+pub mod mrb_models;
+
 pub mod models {
     use std::collections::HashMap;
 
@@ -50,7 +52,7 @@ pub mod models {
         }
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Default)]
     pub struct ElfHeader {
         pub r#type: u16,
         pub machine: u16,
