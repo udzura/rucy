@@ -5,5 +5,5 @@ authors = ["Uchio Kondo <udzura@udzura.jp>"]
 edition = "2018"
 
 [dependencies]
-# mrusty = { git = 'https://github.com/udzura/mrusty.git' }
-mrusty = { path = '../../mrusty' }
+mrusty = { git = 'https://github.com/udzura/mrusty.git' }
+# mrusty = { path = '../../mrusty' }
