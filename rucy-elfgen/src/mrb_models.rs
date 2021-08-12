@@ -16,19 +16,19 @@ pub fn copy_definition_to_rust(mruby: MrubyType) -> Result<Elf, Box<dyn std::err
         scns: vec![],
     };
     let mut symbols: Vec<Symbol> = vec![];
+    let mut index_of_strtab: usize = 0;
     let mut index_of_symtab: usize = 0;
 
     // ehdr: class EHdrValue
     let ehdr = model.get_var("@ehdr").unwrap();
     source.ehdr.r#type = ehdr.get_var("@type").unwrap().to_i32()? as u16;
     source.ehdr.machine = ehdr.get_var("@machine").unwrap().to_i32()? as u16;
-    source.ehdr.shstridx = ehdr.get_var("@shstridx").unwrap().to_i32()? as u16;
 
     // scn: class ScnValue
     for (i, scn) in ehdr.get_var("@scns").unwrap().to_vec()?.iter().enumerate() {
         let mut shdr = SectionHeader::default();
         let mut data = SectionHeaderData::Unset;
-        let scn_type = scn.get_var("@scn_type").unwrap().to_i32()?;
+        let scn_type = scn.get_var("@type").unwrap().to_i32()?;
         let scn_type = SectionType::from_i32(scn_type);
 
         match scn_type {
@@ -39,6 +39,8 @@ pub fn copy_definition_to_rust(mruby: MrubyType) -> Result<Elf, Box<dyn std::err
                 shdr.align = 1;
                 shdr.link = 0;
                 shdr.info = 0;
+
+                index_of_strtab = i + 1;
             }
             SectionType::License => {
                 shdr.name = scn.get_var("@name").unwrap().to_str()?.to_owned();
@@ -87,8 +89,8 @@ pub fn copy_definition_to_rust(mruby: MrubyType) -> Result<Elf, Box<dyn std::err
                 shdr.r#type = SHT_SYMTAB;
                 shdr.flags = 0;
                 shdr.align = 8;
-                shdr.link = scn.get_var("@link").unwrap().to_i32()?.try_into()?;
-                shdr.info = scn.get_var("@info").unwrap().to_i32()?.try_into()?;
+                shdr.link = 0;
+                shdr.info = 1;
 
                 index_of_symtab = i + 1;
             }
@@ -103,9 +105,13 @@ pub fn copy_definition_to_rust(mruby: MrubyType) -> Result<Elf, Box<dyn std::err
         source.scns.push(scn_);
     }
 
+    source.ehdr.shstridx = index_of_strtab as u16;
+
     if index_of_symtab > 0 {
         let mut symtab = source.scns.get_mut(index_of_symtab).unwrap();
         symtab.data = SectionHeaderData::SymTab(symbols);
+
+        symtab.header.link = index_of_strtab as u32;
     }
 
     Ok(source)

@@ -8,6 +8,7 @@ use errno::errno;
 //use std::mem::MaybeUninit;
 use std::path::Path;
 
+pub mod mrb_eval;
 pub mod mrb_models;
 
 pub mod models {
