@@ -7,7 +7,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     const DUMMY_BPF_PROG: &[u8] =
         b"\xb7\x00\x00\x00\x01\x00\x00\x00\x95\x00\x00\x00\x00\x00\x00\x00";
 
-    let arg = std::env::args().nth(1).unwrap();
+    let arg = std::env::args()
+        .nth(1)
+        .expect("Usage: cargo run --example hola -- [ELF_FILE_PATH]");
     println!("Generate elf file: {}", arg);
 
     let symbols = vec![

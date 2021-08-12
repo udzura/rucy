@@ -71,7 +71,7 @@ pub mod models {
         pub data: SectionHeaderData,
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, Default)]
     pub struct SectionHeader {
         pub name: String,
         pub r#type: u32,
@@ -113,6 +113,19 @@ pub mod models {
         Prog,
         License,
         SymTab,
+    }
+
+    impl SectionType {
+        pub fn from_i32(from: i32) -> Self {
+            match from {
+                0 => Self::Null,
+                1 => Self::StrTab,
+                2 => Self::Prog,
+                3 => Self::License,
+                4 => Self::SymTab,
+                _ => panic!("Unsupported: {}", from),
+            }
+        }
     }
 }
 
