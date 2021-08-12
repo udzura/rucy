@@ -8,7 +8,7 @@ use crate::models::*;
 use mrusty::{self};
 use mrusty::{MrValue, Mruby, MrubyError, MrubyImpl, MrubyType, Value};
 
-pub fn copy_definition_to_rust(mruby: MrubyType) -> Result<Elf, Box<dyn std::error::Error>> {
+pub fn copy_definition_to_rust(mruby: &MrubyType) -> Result<Elf, Box<dyn std::error::Error>> {
     let model = mruby.run("Rucy::ELFFile.current_model")?;
     let mut source = Elf {
         ehdr: ElfHeader::default(),
@@ -50,12 +50,12 @@ pub fn copy_definition_to_rust(mruby: MrubyType) -> Result<Elf, Box<dyn std::err
                 shdr.link = 0;
                 shdr.info = 0;
 
-                let data_bin = scn.get_var("@data").unwrap().to_str()?.to_owned();
+                let data_bin = scn.get_var("@data").unwrap().to_bytes()?.to_owned();
                 let len = data_bin.len() as u64;
-                data = SectionHeaderData::Data(data_bin.as_bytes().to_vec());
+                data = SectionHeaderData::Data(data_bin.to_vec());
 
                 let sym = Symbol {
-                    name: scn.get_var("@section_name").unwrap().to_str()?.to_owned(),
+                    name: scn.get_var("@symname").unwrap().to_str()?.to_owned(),
                     shndx: (i + 1) as u16,
                     info: ((STB_GLOBAL << 4) | STT_OBJECT) as u8,
                     value: 0,
@@ -71,12 +71,12 @@ pub fn copy_definition_to_rust(mruby: MrubyType) -> Result<Elf, Box<dyn std::err
                 shdr.link = 0;
                 shdr.info = 0;
 
-                let data_bin = scn.get_var("@data").unwrap().to_str()?.to_owned();
+                let data_bin = scn.get_var("@data").unwrap().to_bytes()?.to_owned();
                 let len = data_bin.len() as u64;
-                data = SectionHeaderData::Data(data_bin.as_bytes().to_vec());
+                data = SectionHeaderData::Data(data_bin.to_vec());
 
                 let sym = Symbol {
-                    name: scn.get_var("@section_name").unwrap().to_str()?.to_owned(),
+                    name: scn.get_var("@symname").unwrap().to_str()?.to_owned(),
                     shndx: (i + 1) as u16,
                     info: ((STB_GLOBAL << 4) | STT_FUNC) as u8,
                     value: 0,
@@ -108,7 +108,7 @@ pub fn copy_definition_to_rust(mruby: MrubyType) -> Result<Elf, Box<dyn std::err
     source.ehdr.shstridx = index_of_strtab as u16;
 
     if index_of_symtab > 0 {
-        let mut symtab = source.scns.get_mut(index_of_symtab).unwrap();
+        let mut symtab = source.scns.get_mut(index_of_symtab - 1).unwrap();
         symtab.data = SectionHeaderData::SymTab(symbols);
 
         symtab.header.link = index_of_strtab as u32;

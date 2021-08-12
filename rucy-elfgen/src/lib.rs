@@ -11,6 +11,9 @@ use std::path::Path;
 pub mod mrb_eval;
 pub mod mrb_models;
 
+pub use mrb_eval::eval_elf_dsl;
+pub use mrb_models::copy_definition_to_rust;
+
 pub mod models {
     use std::collections::HashMap;
 
@@ -38,7 +41,7 @@ pub mod models {
                 .scns
                 .iter()
                 .find(|&x| x.r#type == SectionType::SymTab)
-                .unwrap();
+                .expect("symtab must exist");
             if let SectionHeaderData::SymTab(symbols) = symbol.data.clone() {
                 for sym in symbols.iter() {
                     table
