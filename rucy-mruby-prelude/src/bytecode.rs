@@ -2,10 +2,12 @@ extern crate rucy_mruby_sys_consts;
 
 use rucy_mruby_sys_consts::*;
 
-use std::fmt;
+use std::{fmt, rc::Rc};
 
 #[derive(Debug, Default, Clone)]
 pub struct OpCode {
+    pub syms: Rc<Vec<u32>>,
+
     pub code: rucy_mruby_sys_consts::MRB_INSN,
     pub bin: String,
     pub idx: usize,

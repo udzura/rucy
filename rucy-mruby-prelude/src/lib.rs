@@ -27,7 +27,7 @@ pub fn display_lv(code: &str) -> Result<(), Box<dyn std::error::Error>> {
             let value = Value::new(mruby.clone(), value);
 
             for (i, v) in value.to_vec()?.iter().enumerate() {
-                eprintln!("LV: idx={}, value={:?}", i, v.to_str()?);
+                eprintln!("LV: Reg=R{}, value={:?}", i, v.to_str()?);
             }
         } else {
             eprintln!("Not a proc");
@@ -45,8 +45,13 @@ pub fn display_bytecodes(code: &str) -> Result<(), Box<dyn std::error::Error>> {
     unsafe {
         if val.as_mrb_value().typ == ffi::MrType::MRB_TT_PROC {
             let rproc = ffi::mrb_ext_proc_ptr(mruby.borrow().mrb, *val.as_mrb_value());
-            let p = ffi::mrb_ext_get_insns_from_proc(mruby.borrow().mrb, rproc);
-            let len = ffi::mrb_ext_get_insns_len_from_proc(mruby.borrow().mrb, rproc);
+
+            let syms = ffi::mrb_ext_get_syms_from_proc(mruby.borrow().mrb, rproc);
+            let syms = Value::new(mruby.clone(), syms).to_vec()?;
+            eprintln!("syms: {:?}", syms);
+
+            let p = ffi::mrb_ext_get_insns_from_proc(rproc);
+            let len = ffi::mrb_ext_get_insns_len_from_proc(rproc);
             let insns: &[u8] = std::slice::from_raw_parts(p, len);
 
             let ops = bytecode::process(insns);
@@ -63,6 +68,10 @@ pub fn display_bytecodes(code: &str) -> Result<(), Box<dyn std::error::Error>> {
             eprintln!("Parsed Ops:");
             for op in ops.iter() {
                 eprintln!("{}", op);
+                if op.code == rucy_mruby_sys_consts::MRB_INSN_OP_SEND {
+                    let sym = syms.get(op.b2.unwrap() as usize).unwrap();
+                    eprintln!("symbol B2({})=:{}", op.b2.unwrap(), sym.to_str()?);
+                }
             }
         } else {
             eprintln!("Not a proc");
