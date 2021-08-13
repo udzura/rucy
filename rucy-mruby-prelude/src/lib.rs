@@ -3,7 +3,10 @@ extern crate mrusty;
 use mrusty::mruby_ffi as ffi;
 use mrusty::{MrValue, Mruby, MrubyImpl, Value};
 
+#[allow(dead_code)]
+pub mod bpf;
 pub mod bytecode;
+pub mod chunk;
 
 pub trait MrustyValueExt<'a> {
     fn as_mrb_value(&'a self) -> &'a MrValue;
@@ -27,7 +30,7 @@ pub fn display_lv(code: &str) -> Result<(), Box<dyn std::error::Error>> {
             let value = Value::new(mruby.clone(), value);
 
             for (i, v) in value.to_vec()?.iter().enumerate() {
-                eprintln!("LV: Reg=R{}, value={:?}", i, v.to_str()?);
+                eprintln!("LV: Reg=R{}, value={:?}", i + 1, v.to_str()?);
             }
         } else {
             eprintln!("Not a proc");
