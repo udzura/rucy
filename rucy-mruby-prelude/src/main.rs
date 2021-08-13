@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate mrusty;
 
-use mrusty::{Mruby, MrubyError, MrubyImpl};
+use mrusty::{Mruby, MrubyImpl};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mruby = Mruby::new();

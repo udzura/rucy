@@ -22,7 +22,7 @@ ELFFile.define do |elf|
       scn.symname "my_prog"
       scn.type SectionType::PROG
       # scn.data "aaaaaaaa" + "aaaaaaaa"
-      scn.data "\xb7\x00\x00\x00\x01\x00\x00\x00" +
+      scn.data "\xb7\x00\x00\x00\x00\x00\x00\x00" +
                "\x95\x00\x00\x00\x00\x00\x00\x00"
     end
 

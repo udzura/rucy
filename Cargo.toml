@@ -11,4 +11,5 @@ members = [
     "rucy-mruby-prelude",
     "rucy-libelf-sys",
     "rucy-elfgen",
+    "rucy-mruby-sys-consts",
 ]

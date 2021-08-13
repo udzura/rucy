@@ -46,5 +46,24 @@ pub fn resolve_operand(insn: MRB_INSN) -> u32 {
 ",
     )?;
 
+    f.write_all(
+        b"
+pub fn opcode_from_u32(insn: MRB_INSN) -> &'static str {
+    match insn {
+",
+    )?;
+
+    for cap in re.captures_iter(dsl) {
+        f.write_all(format!("MRB_INSN_OP_{} => \"OP_{}\",\n", &cap[1], &cap[1]).as_bytes())?
+    }
+
+    f.write_all(
+        b"
+        _ => \"unknown\",
+    }
+}
+",
+    )?;
+
     Ok(())
 }

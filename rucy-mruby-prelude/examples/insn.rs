@@ -10,10 +10,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Ruby Code:\n{}", include_str!("proc.rb"));
 
+    rucy_mruby_prelude::display_lv(include_str!("proc.rb"))?;
+    rucy_mruby_prelude::display_bytecodes(include_str!("proc.rb"))?;
     rucy_mruby_prelude::display_insn(include_str!("proc.rb"))?;
 
     println!("Ruby Code:\n{}", include_str!("proc2.rb"));
 
+    rucy_mruby_prelude::display_lv(include_str!("proc2.rb"))?;
+    rucy_mruby_prelude::display_bytecodes(include_str!("proc2.rb"))?;
     rucy_mruby_prelude::display_insn(include_str!("proc2.rb"))?;
 
     Ok(())
