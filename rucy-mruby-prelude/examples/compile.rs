@@ -1,8 +1,30 @@
 extern crate mrusty;
 extern crate rucy_mruby_prelude;
 
-use mrusty::{Mruby, MrubyImpl, Value};
+use mrusty::{Mruby, MrubyImpl, MrubyType, Value};
 use rucy_mruby_prelude::chunk::MrubyChunk;
+
+fn compile(mruby: MrubyType, code: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let proc: Value = mruby.run(code)?;
+
+    eprintln!("Ruby code:");
+    eprintln!("{}", code);
+    let chunk = MrubyChunk::new(mruby.clone(), proc);
+    eprintln!("eBPF insn:");
+    for insn in chunk.translate()?.iter() {
+        eprintln!("{:?}", insn);
+    }
+    eprintln!("Bytecode:");
+    for insn in chunk.translate()?.iter() {
+        let bin: &[u8] = insn.as_bin();
+        for c in bin.iter() {
+            eprint!("{:02x} ", c);
+        }
+        eprintln!("");
+    }
+
+    Ok(())
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mruby = Mruby::new();
@@ -11,16 +33,7 @@ lambda {
   return 0
 }
 ";
-
-    let proc: Value = mruby.run(code)?;
-
-    eprintln!("Ruby code:");
-    eprintln!("{}", code);
-    let chunk = MrubyChunk::new(mruby.clone(), proc);
-    eprintln!("eBPF insn:");
-    for insn in chunk.translate()?.iter() {
-        eprintln!("{:?}", insn);
-    }
+    compile(mruby.clone(), code)?;
 
     let code = "
 lambda {
@@ -28,15 +41,7 @@ lambda {
 }
 ";
 
-    let proc: Value = mruby.run(code)?;
-
-    eprintln!("Ruby code:");
-    eprintln!("{}", code);
-    let chunk = MrubyChunk::new(mruby.clone(), proc);
-    eprintln!("eBPF insn:");
-    for insn in chunk.translate()?.iter() {
-        eprintln!("{:?}", insn);
-    }
+    compile(mruby.clone(), code)?;
 
     Ok(())
 }

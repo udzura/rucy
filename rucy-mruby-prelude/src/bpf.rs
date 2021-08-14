@@ -91,6 +91,14 @@ impl EbpfInsn {
             imm,
         }
     }
+
+    pub fn as_bin(&self) -> &[u8] {
+        unsafe {
+            let bptr = self as *const Self as *const u8;
+            let bsize = std::mem::size_of_val(self);
+            std::slice::from_raw_parts(bptr, bsize)
+        }
+    }
 }
 
 use std::fmt;

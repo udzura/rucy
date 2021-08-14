@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::convert::TryInto;
 
 use mrusty::mruby_ffi as ffi;
 use mrusty::{MrubyType, Value};
@@ -38,11 +39,11 @@ impl MrubyChunk {
 
             let mut regs_maps = HashMap::new();
 
-            let lv_len = lv.len() as u8;
-            regs_maps.insert(lv_len + 1, 0);
-            for r in 0..lv_len {
-                regs_maps.insert(r + 1, r + 1);
-            }
+            // let lv_len = lv.len() as u8;
+            // regs_maps.insert(lv_len + 1, 0);
+            // for r in 0..lv_len {
+            //     regs_maps.insert(r + 1, r + 1);
+            // }
 
             Self {
                 lv,
@@ -53,12 +54,13 @@ impl MrubyChunk {
         }
     }
 
-    fn bpf_reg(&self, mreg: Option<u8>) -> u8 {
-        *self.regs_maps.get(&mreg.unwrap()).unwrap()
-    }
+    // fn bpf_reg(&self, mreg: Option<u8>) -> u8 {
+    //     *self.regs_maps.get(&mreg.unwrap()).unwrap()
+    // }
 
     pub fn translate(&self) -> Result<Vec<EbpfInsn>, Box<dyn std::error::Error>> {
         let mut ret = vec![];
+        let return_reg = 0;
 
         for op in self.ops.iter() {
             match op.code {
@@ -66,18 +68,22 @@ impl MrubyChunk {
                 MRB_INSN_OP_LOADI_0 => {
                     let code = BPF_ALU64 | BPF_K | BPF_MOV;
                     let imm = 0;
-                    let bpf = EbpfInsn::new(code, self.bpf_reg(op.b1), 0, 0, imm);
+                    let bpf = EbpfInsn::new(code, op.b1.unwrap(), 0, 0, imm);
                     ret.push(bpf);
                 }
                 MRB_INSN_OP_LOADI_1 => {
                     let code = BPF_ALU64 | BPF_K | BPF_MOV;
                     let imm = 1;
-                    let bpf = EbpfInsn::new(code, self.bpf_reg(op.b1), 0, 0, imm);
+                    let bpf = EbpfInsn::new(code, op.b1.unwrap(), 0, 0, imm);
                     ret.push(bpf);
                 }
                 // ...
                 MRB_INSN_OP_RETURN_BLK => { /* skip */ }
                 MRB_INSN_OP_RETURN => {
+                    let code = BPF_ALU64 | BPF_X | BPF_MOV;
+                    let bpf = EbpfInsn::new(code, return_reg, op.b1.unwrap(), 0, 0);
+                    ret.push(bpf);
+
                     let code = BPF_JMP | BPF_EXIT;
                     let bpf = EbpfInsn::new(code, 0, 0, 0, 0);
                     ret.push(bpf);
