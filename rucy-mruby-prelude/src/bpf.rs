@@ -83,7 +83,7 @@ pub struct EbpfInsn {
 
 impl EbpfInsn {
     pub fn new(code: u8, dst_reg: u8, src_reg: u8, off: i16, imm: i32) -> Self {
-        let regs = (dst_reg << 4) | src_reg;
+        let regs = (src_reg << 4) | dst_reg;
         Self {
             code,
             regs,
