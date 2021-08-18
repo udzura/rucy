@@ -1,3 +1,4 @@
+use mrusty::Value;
 use rucy_libelf_sys::*;
 
 use std::ffi::c_void;
@@ -8,9 +9,11 @@ use std::path::Path;
 use errno::errno;
 use mrusty::{Mruby, MrubyImpl, MrubyType};
 
+pub mod mrb_binary;
 pub mod mrb_eval;
 pub mod mrb_models;
 
+pub use mrb_binary::compile_and_set_prog;
 pub use mrb_eval::eval_elf_dsl;
 pub use mrb_models::copy_definition_to_rust;
 

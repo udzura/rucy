@@ -25,12 +25,20 @@ ELFFile.define do |elf|
       scn.name "cgroup/dev"
       scn.symname "my_prog"
       scn.type SectionType::PROG
-      # scn.data "aaaaaaaa" + "aaaaaaaa"
-      # scn.data "\xb7\x00\x00\x00\x00\x00\x00\x00" +
-      #          "\x95\x00\x00\x00\x00\x00\x00\x00"
 
-      scn.data code
+      scn.program do
+        return 1
+      end
     end
+
+    # e.section do |scn|
+    #   scn.name "cgroup/dev"
+    #   scn.symname "my_prog"
+    #   scn.type SectionType::PROG
+
+    #   scn.data "\xb7\x00\x00\x00\x00\x00\x00\x00" +
+    #            "\x95\x00\x00\x00\x00\x00\x00\x00"
+    # end
 
     e.section do |scn|
       scn.name ".symtab"

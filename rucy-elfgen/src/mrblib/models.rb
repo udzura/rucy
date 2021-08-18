@@ -8,20 +8,46 @@ module Rucy
       @model ||= model
     end
 
+    def self.program
+      prog = current_model.header.sections.find {|scn| scn.type == SectionType::PROG }
+      if prog
+        prog.data
+      else
+        nil
+      end
+    end
+
+    def self.reset_program(data)
+      prog = current_model.header.sections.find {|scn| scn.type == SectionType::PROG }
+      if prog
+        prog.data(data)
+      else
+        raise "Invalid call context: Maybe a bug"
+      end
+    end
+
     def self.define(&b)
       @model = self.new
       b.call(@model)
     end
 
     def header(&b)
-      @ehdr = EHdrValue.new
-      b.call(@ehdr)
+      if b
+        @ehdr = EHdrValue.new
+        b.call(@ehdr)
+      else
+        @ehdr
+      end
     end
   end
 
   class EHdrValue
-    def type(v)
-      @type = v
+    def type(v=nil)
+      if v
+        @type = v
+      else
+        @type
+      end
     end
 
     def machine(v)
@@ -35,20 +61,35 @@ module Rucy
 
       @scns << scn
     end
+
+    def sections
+      @scns
+    end
   end
 
   class ScnValue
-    def type(v)
-      @type = v
+    def type(v=nil)
+      if v
+        @type = v
+      else
+        @type
+      end
     end
 
     def name(v)
       @name = v
     end
 
-    def data(v)
-      @data = v
+    def data(v=nil, &prog)
+      if prog
+        @data = prog
+      elsif v
+        @data = v
+      else
+        @data
+      end
     end
+    alias program data
 
     def symname(v)
       @symname = v
