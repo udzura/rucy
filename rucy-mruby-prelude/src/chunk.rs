@@ -61,8 +61,11 @@ impl MrubyChunk {
     pub fn translate(&self) -> Result<Vec<EbpfInsn>, Box<dyn std::error::Error>> {
         let mut ret = vec![];
         let return_reg = 0;
+        let len = self.ops.len();
+        let mut i = 0usize;
 
-        for op in self.ops.iter() {
+        while i < len {
+            let op = &self.ops[i];
             match op.code {
                 MRB_INSN_OP_ENTER => { /* skip, TODO get var size */ }
                 MRB_INSN_OP_LOADI_0 => {
@@ -88,10 +91,65 @@ impl MrubyChunk {
                     let bpf = EbpfInsn::new(code, 0, 0, 0, 0);
                     ret.push(bpf);
                 }
+                MRB_INSN_OP_MOVE => {
+                    let code = BPF_ALU64 | BPF_X | BPF_MOV;
+                    let bpf = EbpfInsn::new(code, op.b1.unwrap(), op.b2.unwrap(), 0, 0);
+                    ret.push(bpf);
+                }
+                MRB_INSN_OP_LOADI => {
+                    let code = BPF_ALU64 | BPF_K | BPF_MOV;
+                    let imm = op.b2.unwrap() as i32;
+                    let bpf = EbpfInsn::new(code, op.b1.unwrap(), 0, 0, imm);
+                    ret.push(bpf);
+                }
+                MRB_INSN_OP_LOADI16 => {
+                    let code = BPF_ALU64 | BPF_K | BPF_MOV;
+                    let imm = op.s1.unwrap() as i32;
+                    let bpf = EbpfInsn::new(code, op.b1.unwrap(), 0, 0, imm);
+                    ret.push(bpf);
+                }
+                MRB_INSN_OP_EQ => {
+                    i += 1;
+                    let nextop = &self.ops[i];
+                    match nextop.code {
+                        MRB_INSN_OP_JMPIF => {
+                            // if rX == rY goto L1
+                            let code = BPF_JMP | BPF_K | BPF_JEQ;
+                            // TODO: calc offset
+                            let bpf = EbpfInsn::new(code, op.b1.unwrap(), op.b2.unwrap(), 0 + 2, 0);
+                            ret.push(bpf);
+                        }
+                        MRB_INSN_OP_JMPNOT => {
+                            // if rX != rY goto L1
+                            let code = BPF_JMP | BPF_K | BPF_JNE;
+                            // TODO: calc offset
+                            let bpf = EbpfInsn::new(code, op.b1.unwrap(), op.b2.unwrap(), 0 + 2, 0);
+                            ret.push(bpf);
+                        }
+                        _ => {
+                            unimplemented!("Not yet supported");
+                        }
+                    }
+                }
+                MRB_INSN_OP_JMP => {
+                    // if true goto L2
+                    let code = BPF_JMP | BPF_K | BPF_JA;
+                    // TODO: calc offset
+                    let bpf = EbpfInsn::new(code, 0, 0, 0 + 1, 0);
+                    ret.push(bpf);
+                }
+                MRB_INSN_OP_SEND => {
+                    // TODO: define and calc strust offset
+                    let off = 8;
+                    let code = BPF_LDX | BPF_W | BPF_MEM;
+                    let bpf = EbpfInsn::new(code, op.b1.unwrap(), op.b1.unwrap(), off, 0);
+                    ret.push(bpf);
+                }
                 _ => {
                     unimplemented!("Not yet supported");
                 }
             }
+            i += 1;
         }
 
         Ok(ret)

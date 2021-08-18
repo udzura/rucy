@@ -29,9 +29,13 @@ fn compile(mruby: MrubyType, code: &str) -> Result<(), Box<dyn std::error::Error
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mruby = Mruby::new();
     let code = "
-lambda {
-  return 0
-}
+lambda do |ctx|
+  if ctx.minor == 9
+    return 0
+  else
+    return 1
+  end
+end
 ";
     compile(mruby.clone(), code)?;
 
