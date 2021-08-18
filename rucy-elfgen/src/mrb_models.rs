@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+// use std::convert::TryInto;
 
 use rucy_libelf_sys::consts::*;
 use rucy_mruby_prelude::*;
@@ -6,7 +6,7 @@ use rucy_mruby_prelude::*;
 use crate::models::*;
 
 use mrusty::{self};
-use mrusty::{MrValue, Mruby, MrubyError, MrubyImpl, MrubyType, Value};
+use mrusty::{MrubyImpl, MrubyType};
 
 pub fn copy_definition_to_rust(mruby: &MrubyType) -> Result<Elf, Box<dyn std::error::Error>> {
     let model = mruby.run("Rucy::ELFFile.current_model")?;

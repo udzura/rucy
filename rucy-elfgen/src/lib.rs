@@ -1,12 +1,12 @@
 use rucy_libelf_sys::*;
+
 use std::ffi::c_void;
 use std::fs::File;
 use std::os::unix::io::IntoRawFd;
+use std::path::Path;
 
 use errno::errno;
-
-//use std::mem::MaybeUninit;
-use std::path::Path;
+use mrusty::{Mruby, MrubyImpl, MrubyType};
 
 pub mod mrb_eval;
 pub mod mrb_models;
@@ -131,6 +131,20 @@ pub mod models {
             }
         }
     }
+}
+
+pub fn prelude(mruby: &MrubyType) -> Result<(), Box<dyn std::error::Error>> {
+    let prelude = include_str!("mrblib/models.rb");
+    mruby.run(prelude)?;
+
+    Ok(())
+}
+
+pub fn new_mruby_env() -> Result<MrubyType, Box<dyn std::error::Error>> {
+    let mruby = Mruby::new();
+    prelude(&mruby)?;
+
+    Ok(mruby)
 }
 
 pub fn generate(

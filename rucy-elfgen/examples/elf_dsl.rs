@@ -1,6 +1,5 @@
 extern crate mrusty;
 extern crate rucy_elfgen;
-use rucy_elfgen::models::*;
 use rucy_libelf_sys::consts::*;
 use std::path::Path;
 
@@ -11,7 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let dest = std::env::args().nth(2).expect(USAGE);
 
-    let mruby = mrusty::Mruby::new();
+    let mruby = rucy_elfgen::new_mruby_env()?;
 
     rucy_elfgen::eval_elf_dsl(&mruby, &Path::new(&script))?;
     let source = rucy_elfgen::copy_definition_to_rust(&mruby)?;
