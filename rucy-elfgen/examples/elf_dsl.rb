@@ -26,9 +26,17 @@ ELFFile.define do |elf|
       scn.symname "my_prog"
       scn.type SectionType::PROG
 
-      scn.program do
-        return 1
+      scn.program do |ctx|
+        if ctx.minor == 9
+          return 0
+        else
+          return 1
+        end
       end
+
+      # scn.program do
+      #   return 1
+      # end
     end
 
     # e.section do |scn|

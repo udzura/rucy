@@ -114,16 +114,18 @@ impl MrubyChunk {
                     match nextop.code {
                         MRB_INSN_OP_JMPIF => {
                             // if rX == rY goto L1
-                            let code = BPF_JMP | BPF_K | BPF_JEQ;
-                            // TODO: calc offset
-                            let bpf = EbpfInsn::new(code, op.b1.unwrap(), op.b2.unwrap(), 0 + 2, 0);
+                            let code = BPF_JMP | BPF_X | BPF_JEQ;
+                            // TODO: calc offset from nextop.s1
+                            let bpf =
+                                EbpfInsn::new(code, op.b1.unwrap(), op.b1.unwrap() + 1, 0 + 2, 0);
                             ret.push(bpf);
                         }
                         MRB_INSN_OP_JMPNOT => {
                             // if rX != rY goto L1
-                            let code = BPF_JMP | BPF_K | BPF_JNE;
-                            // TODO: calc offset
-                            let bpf = EbpfInsn::new(code, op.b1.unwrap(), op.b2.unwrap(), 0 + 2, 0);
+                            let code = BPF_JMP | BPF_X | BPF_JNE;
+                            // TODO: calc offset from nextop.s1
+                            let bpf =
+                                EbpfInsn::new(code, op.b1.unwrap(), op.b1.unwrap() + 1, 0 + 2, 0);
                             ret.push(bpf);
                         }
                         _ => {

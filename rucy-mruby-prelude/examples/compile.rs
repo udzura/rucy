@@ -9,6 +9,7 @@ fn compile(mruby: MrubyType, code: &str) -> Result<(), Box<dyn std::error::Error
 
     eprintln!("Ruby code:");
     eprintln!("{}", code);
+    rucy_mruby_prelude::display_insn(code)?;
     let chunk = MrubyChunk::new(mruby.clone(), proc);
     eprintln!("eBPF insn:");
     for insn in chunk.translate()?.iter() {
