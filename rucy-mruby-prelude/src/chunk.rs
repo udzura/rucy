@@ -10,6 +10,13 @@ use crate::bpf::*;
 use crate::bytecode::{self, OpCode};
 use crate::MrustyValueExt;
 
+#[derive(Debug)]
+pub struct Label {
+    pub mruby_target_pc: u16,
+    pub bpf_dest_pc: usize,
+    pub bpf_target_pc: Option<usize>,
+}
+
 pub struct MrubyChunk {
     pub lv: Vec<Value>,
     pub syms: Vec<Value>,
@@ -51,6 +58,8 @@ impl MrubyChunk {
 
         let mut lv_maps: HashMap<u8, String> = HashMap::new();
 
+        let mut labels: Vec<Label> = vec![];
+
         for (i, v) in self.lv.iter().enumerate() {
             if v.to_str().unwrap() != "&" {
                 lv_maps.insert((i + 1) as u8, v.to_str()?.to_owned());
@@ -60,6 +69,15 @@ impl MrubyChunk {
 
         while i < len {
             let op = &self.ops[i];
+            let bpf_pc = (&ret).len();
+
+            if let Some(label) = labels
+                .iter_mut()
+                .find(|l| (*l).mruby_target_pc == (op.idx as u16))
+            {
+                label.bpf_target_pc = Some(bpf_pc);
+            }
+
             match op.code {
                 MRB_INSN_OP_ENTER => { /* skip, TODO get var size */ }
                 MRB_INSN_OP_LOADI_0 => {
@@ -111,21 +129,26 @@ impl MrubyChunk {
                 MRB_INSN_OP_EQ => {
                     i += 1;
                     let nextop = &self.ops[i];
+                    let label = Label {
+                        mruby_target_pc: nextop.s1.unwrap() + (nextop.pc_base as u16),
+                        bpf_dest_pc: bpf_pc,
+                        bpf_target_pc: None,
+                    };
+                    labels.push(label);
                     match nextop.code {
                         MRB_INSN_OP_JMPIF => {
                             // if rX == rY goto L1
                             let code = BPF_JMP | BPF_X | BPF_JEQ;
+
                             // TODO: calc offset from nextop.s1
-                            let bpf =
-                                EbpfInsn::new(code, op.b1.unwrap(), op.b1.unwrap() + 1, 0 + 2, 0);
+                            let bpf = EbpfInsn::new(code, op.b1.unwrap(), op.b1.unwrap() + 1, 0, 0);
                             ret.push(bpf);
                         }
                         MRB_INSN_OP_JMPNOT => {
                             // if rX != rY goto L1
                             let code = BPF_JMP | BPF_X | BPF_JNE;
                             // TODO: calc offset from nextop.s1
-                            let bpf =
-                                EbpfInsn::new(code, op.b1.unwrap(), op.b1.unwrap() + 1, 0 + 2, 0);
+                            let bpf = EbpfInsn::new(code, op.b1.unwrap(), op.b1.unwrap() + 1, 0, 0);
                             ret.push(bpf);
                         }
                         _ => {
@@ -134,10 +157,17 @@ impl MrubyChunk {
                     }
                 }
                 MRB_INSN_OP_JMP => {
+                    let label = Label {
+                        mruby_target_pc: op.s1.unwrap() + (op.pc_base as u16),
+                        bpf_dest_pc: bpf_pc,
+                        bpf_target_pc: None,
+                    };
+                    labels.push(label);
                     // if true goto L2
                     let code = BPF_JMP | BPF_K | BPF_JA;
                     // TODO: calc offset
-                    let bpf = EbpfInsn::new(code, 0, 0, 0 + 1, 0);
+
+                    let bpf = EbpfInsn::new(code, 0, 0, 0, 0);
                     ret.push(bpf);
                 }
                 MRB_INSN_OP_SEND => {
@@ -161,6 +191,7 @@ impl MrubyChunk {
             }
             i += 1;
         }
+        dbg!(labels);
 
         Ok(ret)
     }
