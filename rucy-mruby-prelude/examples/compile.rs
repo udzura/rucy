@@ -41,6 +41,17 @@ end
     compile(mruby.clone(), code)?;
 
     let code = "
+lambda do |ctx|
+  if ctx.major == 1 && ctx.minor == 9
+    return 0
+  else
+    return 1
+  end
+end
+";
+    compile(mruby.clone(), code)?;
+
+    let code = "
 lambda {
   return 1
 }

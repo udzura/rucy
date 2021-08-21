@@ -14,8 +14,6 @@ pub struct MrubyChunk {
     pub lv: Vec<Value>,
     pub syms: Vec<Value>,
     pub ops: Vec<OpCode>,
-
-    pub regs_maps: HashMap<u8, u8>,
 }
 
 impl MrubyChunk {
@@ -37,20 +35,7 @@ impl MrubyChunk {
             let insns: &[u8] = std::slice::from_raw_parts(p, len);
             let ops = bytecode::process(insns);
 
-            let mut regs_maps = HashMap::new();
-
-            // let lv_len = lv.len() as u8;
-            // regs_maps.insert(lv_len + 1, 0);
-            // for r in 0..lv_len {
-            //     regs_maps.insert(r + 1, r + 1);
-            // }
-
-            Self {
-                lv,
-                syms,
-                ops,
-                regs_maps,
-            }
+            Self { lv, syms, ops }
         }
     }
 
@@ -63,6 +48,15 @@ impl MrubyChunk {
         let return_reg = 0;
         let len = self.ops.len();
         let mut i = 0usize;
+
+        let mut lv_maps: HashMap<u8, String> = HashMap::new();
+
+        for (i, v) in self.lv.iter().enumerate() {
+            if v.to_str().unwrap() != "&" {
+                lv_maps.insert((i + 1) as u8, v.to_str()?.to_owned());
+                dbg!(&lv_maps);
+            }
+        }
 
         while i < len {
             let op = &self.ops[i];
@@ -92,6 +86,12 @@ impl MrubyChunk {
                     ret.push(bpf);
                 }
                 MRB_INSN_OP_MOVE => {
+                    if lv_maps.keys().any(|k| *k == (op.b2.unwrap())) {
+                        let lname = lv_maps.get(&op.b2.unwrap()).unwrap().to_owned();
+                        lv_maps.insert(op.b1.unwrap(), lname);
+                        dbg!(&lv_maps);
+                    }
+
                     let code = BPF_ALU64 | BPF_X | BPF_MOV;
                     let bpf = EbpfInsn::new(code, op.b1.unwrap(), op.b2.unwrap(), 0, 0);
                     ret.push(bpf);
@@ -142,7 +142,15 @@ impl MrubyChunk {
                 }
                 MRB_INSN_OP_SEND => {
                     // TODO: define and calc strust offset
-                    let off = 8;
+                    let varname = lv_maps.get(&op.b1.unwrap()).unwrap().to_owned();
+                    let symname = self.syms.get(op.b2.unwrap() as usize).unwrap();
+                    let symname = symname.to_str()?.to_owned();
+                    dbg!(&varname, &symname);
+
+                    lv_maps.remove(&op.b1.unwrap());
+                    dbg!(&lv_maps);
+
+                    let off = self.calculate_struct_offset(&varname, &symname);
                     let code = BPF_LDX | BPF_W | BPF_MEM;
                     let bpf = EbpfInsn::new(code, op.b1.unwrap(), op.b1.unwrap(), off, 0);
                     ret.push(bpf);
@@ -155,5 +163,15 @@ impl MrubyChunk {
         }
 
         Ok(ret)
+    }
+
+    fn calculate_struct_offset(&self, varname: &str, symname: &str) -> i16 {
+        if varname == "ctx" && symname == "minor" {
+            8
+        } else if varname == "ctx" && symname == "major" {
+            4
+        } else {
+            unimplemented!("TODO: parse struct info from mruby and store it")
+        }
     }
 }
