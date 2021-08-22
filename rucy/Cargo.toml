@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 structopt = "0.3.22"
+mrusty = { git = 'https://github.com/udzura/mrusty.git' }
 rucy-elfgen  = { path = "../rucy-elfgen" }
 rucy-libelf-sys = { path = "../rucy-libelf-sys" }
 rucy-mruby-prelude = { path = "../rucy-mruby-prelude" }

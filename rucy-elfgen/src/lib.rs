@@ -140,6 +140,9 @@ pub fn prelude(mruby: &MrubyType) -> Result<(), Box<dyn std::error::Error>> {
     let prelude = include_str!("mrblib/models.rb");
     mruby.run(prelude)?;
 
+    let prelude = include_str!("mrblib/entrypoint.rb");
+    mruby.run(prelude)?;
+
     Ok(())
 }
 
