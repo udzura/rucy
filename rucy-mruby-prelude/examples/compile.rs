@@ -2,21 +2,27 @@ extern crate mrusty;
 extern crate rucy_mruby_prelude;
 
 use mrusty::{Mruby, MrubyImpl, MrubyType, Value};
-use rucy_mruby_prelude::chunk::MrubyChunk;
+use rucy_mruby_prelude::chunk::*;
 
 fn compile(mruby: MrubyType, code: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let proc: Value = mruby.run(code)?;
-
     eprintln!("Ruby code:");
     eprintln!("{}", code);
-    rucy_mruby_prelude::display_insn(code)?;
-    let chunk = MrubyChunk::new(mruby.clone(), proc);
+
+    rucy_mruby_prelude::display_insn_nstring(code)?;
+
+    let p = rucy_mruby_prelude::get_debug_proc_nstring(mruby.clone(), code)?;
+    let chunk = Chunk::new(mruby.clone(), p);
+    let args = chunk.args();
+    let prog = chunk.prog_def.unwrap();
+
+    let insns = prog.translate(args.into_boxed_slice())?;
+
     eprintln!("eBPF insn:");
-    for insn in chunk.translate()?.iter() {
+    for insn in insns.iter() {
         eprintln!("{:?}", insn);
     }
     eprintln!("Bytecode:");
-    for insn in chunk.translate()?.iter() {
+    for insn in insns.iter() {
         let bin: &[u8] = insn.as_bin();
         for c in bin.iter() {
             eprint!("{:02x} ", c);
@@ -30,18 +36,32 @@ fn compile(mruby: MrubyType, code: &str) -> Result<(), Box<dyn std::error::Error
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mruby = Mruby::new();
     let code = "
-lambda do |ctx|
-  if ctx.minor == 9
-    return 0
-  else
-    return 1
-  end
+license! \"GPL\"
+section! \"dev/cgroup\"
+
+class Ctx
+  attr :access_type, :u32
+  attr :major, :u32
+  attr :minor, :u32
+end
+
+def prog(ctx)
+  return 0
 end
 ";
     compile(mruby.clone(), code)?;
 
     let code = "
-lambda do |ctx|
+license! \"GPL\"
+section! \"dev/cgroup\"
+
+class Ctx
+  attr :access_type, :u32
+  attr :major, :u32
+  attr :minor, :u32
+end
+
+def prog(ctx)
   if ctx.major == 1 && ctx.minor == 9
     return 0
   else
@@ -51,13 +71,19 @@ end
 ";
     compile(mruby.clone(), code)?;
 
-    let code = "
-lambda {
-  return 1
-}
-";
+    //     let code = "
+    // class Ctx
+    //   attr :access_type, :u32
+    //   attr :major, :u32
+    //   attr :minor, :u32
+    // end
 
-    compile(mruby.clone(), code)?;
+    // def prog
+    //   return 1
+    // end
+    // ";
+
+    //     compile(mruby.clone(), code)?;
 
     Ok(())
 }

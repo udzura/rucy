@@ -101,3 +101,29 @@ pub fn display_insn(code: &str) -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+pub fn display_insn_nstring(code: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let mruby = Mruby::new();
+
+    unsafe {
+        let len = code.len() as i32;
+        let ptr = code.as_ptr();
+        let rproc = ffi::mrb_ext_parse_nstring_as_proc(mruby.borrow().mrb, ptr, len);
+        ffi::mrb_codedump_all(mruby.borrow().mrb, rproc);
+    }
+
+    Ok(())
+}
+
+pub fn get_debug_proc_nstring(
+    mruby: mrusty::MrubyType,
+    code: &str,
+) -> Result<*const ffi::MrProc, Box<dyn std::error::Error>> {
+    let rproc = unsafe {
+        let len = code.len() as i32;
+        let ptr = code.as_ptr();
+        ffi::mrb_ext_parse_nstring_as_proc(mruby.borrow().mrb, ptr, len)
+    };
+
+    Ok(rproc)
+}

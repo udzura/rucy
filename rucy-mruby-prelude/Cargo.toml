@@ -6,5 +6,5 @@ edition = "2018"
 
 [dependencies]
 rucy-mruby-sys-consts = { path = "../rucy-mruby-sys-consts" }
-mrusty = { git = 'https://github.com/udzura/mrusty.git' }
-# mrusty = { path = '../../mrusty' }
+# mrusty = { git = 'https://github.com/udzura/mrusty.git' }
+mrusty = { path = '../../mrusty' }

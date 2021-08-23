@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::convert::TryInto;
+use std::ffi::CStr;
+use std::ffi::CString;
 
 use mrusty::mruby_ffi as ffi;
 use mrusty::{MrubyType, Value};
@@ -17,40 +19,188 @@ pub struct Label {
     pub bpf_target_pc: Option<usize>,
 }
 
-pub struct MrubyChunk {
-    pub lv: Vec<Value>,
-    pub syms: Vec<Value>,
+pub struct Chunk {
+    mruby: MrubyType,
+    // rproc: *const ffi::MrProc,
+    pub root: Irep,
+    pub struct_def: Option<Irep>,
+    pub prog_def: Option<Irep>,
+
+    pub section_name: String,
+    pub prog_name: String,
+    pub license: String,
+}
+
+#[derive(Debug)]
+pub struct Irep {
+    irep: *const ffi::MrIrep,
+
+    pub subreps: Vec<*const ffi::MrIrep>,
+    pub lv: Vec<CString>,
+    pub syms: Vec<CString>,
+    pub insns: Vec<u8>,
     pub ops: Vec<OpCode>,
 }
 
-impl MrubyChunk {
-    pub fn new(mruby: MrubyType, proc: Value) -> Self {
-        if proc.as_mrb_value().typ != ffi::MrType::MRB_TT_PROC {
-            panic!("Require Proc value");
-        }
-        unsafe {
-            let rproc = ffi::mrb_ext_proc_ptr(mruby.borrow().mrb, *proc.as_mrb_value());
+impl Chunk {
+    pub fn new(mruby: MrubyType, rproc: *const ffi::MrProc) -> Self {
+        let irep = unsafe { ffi::mrb_ext_irep_from_rproc(rproc) };
+        let root = unsafe { Irep::new(mruby.clone(), irep) };
 
-            let lv = ffi::mrb_ext_get_locals_from_proc(mruby.borrow().mrb, rproc);
-            let lv = Value::new(mruby.clone(), lv).to_vec().unwrap();
+        let mut ret = Self {
+            mruby,
+            // rproc,
+            root,
+            struct_def: None,
+            prog_def: None,
+            section_name: "".to_string(),
+            prog_name: "".to_string(),
+            license: "".to_string(),
+        };
+        ret.walk_root_insn();
 
-            let syms = ffi::mrb_ext_get_syms_from_proc(mruby.borrow().mrb, rproc);
-            let syms = Value::new(mruby.clone(), syms).to_vec().unwrap();
+        ret
+    }
 
-            let p = ffi::mrb_ext_get_insns_from_proc(rproc);
-            let len = ffi::mrb_ext_get_insns_len_from_proc(rproc);
-            let insns: &[u8] = std::slice::from_raw_parts(p, len);
-            let ops = bytecode::process(insns);
-
-            Self { lv, syms, ops }
+    pub fn args(&self) -> Vec<Box<[ProgArg]>> {
+        match &self.struct_def {
+            Some(def) => {
+                let args = def.as_args().unwrap().into_boxed_slice();
+                vec![args]
+            }
+            None => {
+                vec![]
+            }
         }
     }
 
-    // fn bpf_reg(&self, mreg: Option<u8>) -> u8 {
-    //     *self.regs_maps.get(&mreg.unwrap()).unwrap()
-    // }
+    pub fn walk_root_insn(&mut self) {
+        let oplen = self.root.ops.len();
+        let mut i = 0;
+        while i < oplen {
+            let op = &self.root.ops[i];
+            match op.code {
+                MRB_INSN_OP_STRING => {
+                    let strval = self.root.get_string_instance(op.b2.unwrap());
 
-    pub fn translate(&self) -> Result<Vec<EbpfInsn>, Box<dyn std::error::Error>> {
+                    i += 1;
+                    let nop = &self.root.ops[i];
+                    if nop.code == MRB_INSN_OP_SEND {
+                        let meth = &self.root.syms[nop.b2.unwrap() as usize];
+                        match meth.to_str().unwrap() {
+                            "license!" => {
+                                self.license = strval.to_str().unwrap().to_owned();
+                            }
+                            "section!" => {
+                                self.section_name = strval.to_str().unwrap().to_owned();
+                            }
+                            _ => {
+                                panic!("Invalid DSL: {:?}", meth);
+                            }
+                        }
+                    }
+                }
+                MRB_INSN_OP_EXEC => {
+                    let rep = self.root.subreps[op.b2.unwrap() as usize];
+                    let rep = unsafe { Irep::new(self.mruby.clone(), rep) };
+                    self.struct_def = Some(rep);
+                }
+                MRB_INSN_OP_METHOD => {
+                    let rep = self.root.subreps[op.b2.unwrap() as usize];
+                    let rep = unsafe { Irep::new(self.mruby.clone(), rep) };
+                    self.prog_def = Some(rep);
+                }
+                MRB_INSN_OP_DEF => {
+                    let strval = self.root.get_string_instance(op.b2.unwrap());
+                    self.prog_name = strval.to_str().unwrap().to_owned();
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+    }
+}
+
+impl Irep {
+    pub unsafe fn new(mruby: MrubyType, irep: *const ffi::MrIrep) -> Self {
+        let irep_ = std::mem::transmute::<*const ffi::MrIrep, &ffi::MrIrep>(irep);
+
+        let subreps = std::slice::from_raw_parts(irep_.reps, irep_.rlen as usize).to_vec();
+        let lv = std::slice::from_raw_parts(irep_.lv, (irep_.nlocals - 1) as usize).to_vec();
+        let lv = lv
+            .into_iter()
+            .map(|sym| CStr::from_ptr(ffi::mrb_sym_dump(mruby.borrow().mrb, sym)).into())
+            .collect();
+        let syms = std::slice::from_raw_parts(irep_.syms, irep_.slen as usize).to_vec();
+        let syms = syms
+            .into_iter()
+            .map(|sym| CStr::from_ptr(ffi::mrb_sym_dump(mruby.borrow().mrb, sym)).into())
+            .collect();
+        let insns = std::slice::from_raw_parts(irep_.iseq, irep_.ilen as usize).to_vec();
+
+        let ops = crate::bytecode::process(&insns);
+        Self {
+            irep,
+            subreps,
+            lv,
+            syms,
+            insns,
+            ops,
+        }
+    }
+
+    pub fn get_string_instance(&self, index: u8) -> CString {
+        unsafe { CStr::from_ptr(ffi::mrb_ext_str_from_pool(self.irep, index as usize)) }.to_owned()
+    }
+
+    pub fn as_args(&self) -> Result<Vec<ProgArg>, Box<dyn std::error::Error>> {
+        let mut ret = vec![];
+        let len = self.ops.len();
+        let mut off: i16 = 0;
+        let mut i = 0usize;
+
+        while i < len {
+            let op = &self.ops[i];
+            match op.code {
+                MRB_INSN_OP_LOADSYM => {
+                    let op2 = &self.ops[i + 1];
+                    if op2.code != MRB_INSN_OP_LOADSYM {
+                        continue;
+                    }
+                    i += 1;
+                    let op3 = &self.ops[i + 1];
+                    if op3.code != MRB_INSN_OP_SEND {
+                        continue;
+                    }
+                    if (&self.syms[op3.b2.unwrap() as usize]).to_str().unwrap() != "attr" {
+                        continue;
+                    }
+                    i += 1;
+
+                    let member_name = &self.syms[op.b2.unwrap() as usize];
+                    let member_type = &self.syms[op2.b2.unwrap() as usize];
+
+                    let arg = ProgArg::new(
+                        off,
+                        member_name.to_str().unwrap().to_string(),
+                        member_type.to_str().unwrap(),
+                    );
+                    off = (&arg).next_offset;
+                    ret.push(arg);
+                }
+                _ => {}
+            }
+
+            i += 1;
+        }
+        dbg!(&ret);
+        Ok(ret)
+    }
+
+    pub fn translate(
+        &self,
+        args: Box<[Box<[ProgArg]>]>,
+    ) -> Result<Vec<EbpfInsn>, Box<dyn std::error::Error>> {
         let mut ret = vec![];
         let return_reg = 0;
         let len = self.ops.len();
@@ -185,7 +335,8 @@ impl MrubyChunk {
                     lv_maps.remove(&op.b1.unwrap());
                     dbg!(&lv_maps);
 
-                    let off = self.calculate_struct_offset(&varname, &symname);
+                    let n = 0; // TODO: support arity >= 2
+                    let off = self.calculate_struct_offset(&args, n, &symname);
                     let code = BPF_LDX | BPF_W | BPF_MEM;
                     let bpf = EbpfInsn::new(code, op.b1.unwrap(), op.b1.unwrap(), off, 0);
                     ret.push(bpf);
@@ -208,13 +359,17 @@ impl MrubyChunk {
         Ok(ret)
     }
 
-    fn calculate_struct_offset(&self, varname: &str, symname: &str) -> i16 {
-        if varname == "ctx" && symname == "minor" {
-            8
-        } else if varname == "ctx" && symname == "major" {
-            4
-        } else {
-            unimplemented!("TODO: parse struct info from mruby and store it")
-        }
+    fn calculate_struct_offset(
+        &self,
+        args: &Box<[Box<[ProgArg]>]>,
+        n: usize,
+        symname: &str,
+    ) -> i16 {
+        let arg = args.get(n).expect("invalid local var");
+        let off = arg
+            .iter()
+            .find(|a| a.name == symname)
+            .expect("invalid member name");
+        off.offset
     }
 }

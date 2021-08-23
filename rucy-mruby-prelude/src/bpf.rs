@@ -70,6 +70,32 @@ pub const BPF_FETCH: u8 = 0x01;
 pub const BPF_XCHG: u8 = 0xe0 | BPF_FETCH;
 pub const BPF_CMPXCHG: u8 = 0xf0 | BPF_FETCH;
 
+#[derive(Default, Debug, Clone)]
+pub struct ProgArg {
+    pub name: String,
+    pub offset: i16,
+    pub next_offset: i16,
+}
+
+impl ProgArg {
+    pub fn new(offset: i16, name: String, off_type: &str) -> Self {
+        let next_offset = match off_type {
+            "u8" | "i8" => 1,
+            "u16" | "i16" => 2,
+            "u32" | "i32" => 4,
+            "u64" | "i64" => 8,
+            _ => {
+                unimplemented!("Unsupported type name")
+            }
+        } + offset;
+        Self {
+            name,
+            offset,
+            next_offset,
+        }
+    }
+}
+
 #[repr(C)]
 #[derive(Default, Clone)]
 pub struct EbpfInsn {
