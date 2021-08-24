@@ -59,7 +59,7 @@ Disassembly of section cgroup/dev:
 
 ## Demo
 
-<blockquote class="twitter-tweet"><p lang="ja" dir="ltr"><a href="https://t.co/8JSwJySnNJ">pic.twitter.com/8JSwJySnNJ</a></p>&mdash; udzura (@udzura) <a href="https://twitter.com/udzura/status/1430046852699680769?ref_src=twsrc%5Etfw">August 24, 2021</a></blockquote> <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script> 
+* https://twitter.com/i/status/1430046852699680769
 
 ## TODO
 
