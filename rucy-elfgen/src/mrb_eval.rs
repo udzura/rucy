@@ -13,7 +13,7 @@ use mrusty::Mruby;
 use mrusty::{MrValue, MrubyError, MrubyImpl, MrubyType, Value};
 
 pub fn make_chunk_from_snippet(
-    mruby: &MrubyType,
+    mruby: MrubyType,
     script: &Path,
 ) -> Result<chunk::Chunk, Box<dyn std::error::Error>> {
     let mut f = File::open(script)?;

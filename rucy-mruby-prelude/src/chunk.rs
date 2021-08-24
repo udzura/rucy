@@ -111,8 +111,8 @@ impl Chunk {
                     self.prog_def = Some(rep);
                 }
                 MRB_INSN_OP_DEF => {
-                    let strval = self.root.get_string_instance(op.b2.unwrap());
-                    self.prog_name = strval;
+                    let strval = &self.root.syms[op.b2.unwrap() as usize];
+                    self.prog_name = strval.to_owned();
                 }
                 _ => {}
             }
@@ -245,13 +245,16 @@ impl Irep {
                 // ...
                 MRB_INSN_OP_RETURN_BLK => { /* skip */ }
                 MRB_INSN_OP_RETURN => {
-                    let code = BPF_ALU64 | BPF_X | BPF_MOV;
-                    let bpf = EbpfInsn::new(code, return_reg, op.b1.unwrap(), 0, 0);
-                    ret.push(bpf);
+                    // eval only on final op_return
+                    if i + 1 == len {
+                        let code = BPF_ALU64 | BPF_X | BPF_MOV;
+                        let bpf = EbpfInsn::new(code, return_reg, op.b1.unwrap(), 0, 0);
+                        ret.push(bpf);
 
-                    let code = BPF_JMP | BPF_EXIT;
-                    let bpf = EbpfInsn::new(code, 0, 0, 0, 0);
-                    ret.push(bpf);
+                        let code = BPF_JMP | BPF_EXIT;
+                        let bpf = EbpfInsn::new(code, 0, 0, 0, 0);
+                        ret.push(bpf);
+                    }
                 }
                 MRB_INSN_OP_MOVE => {
                     if lv_maps.keys().any(|k| *k == (op.b2.unwrap())) {

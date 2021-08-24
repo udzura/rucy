@@ -9,7 +9,7 @@ pub fn value_from_binary(mruby: MrubyType, value: &[u8]) -> mrusty::Value {
 }
 
 pub fn register_chunk(mruby: MrubyType, chunk: Value) -> Result<(), Box<dyn std::error::Error>> {
-    let klass = mruby.run("Rucy::ELFFile")?;
+    let klass = mruby.run("Rucy")?;
     klass.set_var("@dsl", chunk);
     Ok(())
 }

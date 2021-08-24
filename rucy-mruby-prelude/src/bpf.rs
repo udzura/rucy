@@ -125,6 +125,14 @@ impl EbpfInsn {
             std::slice::from_raw_parts(bptr, bsize)
         }
     }
+
+    pub fn concat_bin(selfs: &Vec<Self>) -> Vec<u8> {
+        selfs
+            .iter()
+            .map(|i| i.as_bin())
+            .collect::<Vec<&[u8]>>()
+            .concat()
+    }
 }
 
 use std::fmt;

@@ -1,6 +1,6 @@
 extern crate rucy_elfgen;
 
-use std::path::Path;
+use std::path::PathBuf;
 
 use mrusty::{self};
 //use mrusty::{MrValue, Mruby, MrubyError, MrubyImpl, MrubyType, Value};
@@ -18,14 +18,14 @@ enum Cmd {
         #[structopt(short, long)]
         dest: String,
         #[structopt()]
-        file: String,
+        file: PathBuf,
     },
     Build {
         /// Enable debug output
         #[structopt(short = "v")]
         debug: bool,
         #[structopt()]
-        file: String,
+        file: PathBuf,
     },
 }
 
@@ -38,10 +38,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } => {
             let mruby: MrubyType = rucy_elfgen::new_mruby_env()?;
             mruby.run("Rucy.object_create_mode!")?;
+            let chunk = rucy_elfgen::make_chunk_from_snippet(mruby.clone(), &file)?;
+            let args = chunk.args();
+            let prog = chunk.prog_def.unwrap();
+            let insns = prog.translate(args.into_boxed_slice())?;
 
-            mruby.execute(&Path::new(&file))?;
+            dbg!(&chunk.prog_name);
+
+            let chunk = rucy_elfgen::make_mruby_chunk(
+                mruby.clone(),
+                &chunk.section_name,
+                &chunk.prog_name,
+                &chunk.license,
+                &rucy_mruby_prelude::bpf::EbpfInsn::concat_bin(&insns),
+            );
+            rucy_elfgen::register_chunk(mruby.clone(), chunk)?;
             mruby.run("Rucy::Internal.register_dsl")?;
-            rucy_elfgen::compile_and_set_prog(mruby.clone())?;
 
             let source = rucy_elfgen::copy_definition_to_rust(&mruby)?;
 

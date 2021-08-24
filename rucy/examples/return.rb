@@ -1,12 +1,12 @@
-Rucy.build do |prog|
-  prog.license "GPL"
-  prog.section "cgroup/dev"
-  prog.args    [
-    "struct bpf_cgroup_dev_ctx",
-    [:u32, "access_type"], [:u32, "major"], [:u32, "minor"]
-]
+license! "GPL"
+section! "cgroup/dev"
 
-  prog.function do |ctx|
-    return 0
-  end
+class Context
+  attr :access_type, :u32
+  attr :major, :u32
+  attr :minor, :u32
+end
+
+def prog(ctx)
+  return 0
 end

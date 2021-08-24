@@ -14,7 +14,7 @@ pub mod mrb_eval;
 pub mod mrb_models;
 
 pub use mrb_binary::register_chunk;
-pub use mrb_eval::make_mruby_chunk;
+pub use mrb_eval::{make_chunk_from_snippet, make_mruby_chunk};
 pub use mrb_models::copy_definition_to_rust;
 
 pub mod models {

@@ -89,6 +89,9 @@ module Rucy
   class Internal
     def self.register_dsl
       dsl = Rucy.chunk
+      if ! dsl
+        raise "DSL not registered"
+      end
 
       ELFFile.define do |elf|
         elf.header do |e|
