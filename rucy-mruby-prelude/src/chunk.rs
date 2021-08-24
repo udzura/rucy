@@ -193,7 +193,6 @@ impl Irep {
 
             i += 1;
         }
-        dbg!(&ret);
         Ok(ret)
     }
 
@@ -213,7 +212,6 @@ impl Irep {
         for (i, v) in self.lv.iter().enumerate() {
             if v.to_str().unwrap() != "&" {
                 lv_maps.insert((i + 1) as u8, v.to_str()?.to_owned());
-                dbg!(&lv_maps);
             }
         }
 
@@ -260,7 +258,6 @@ impl Irep {
                     if lv_maps.keys().any(|k| *k == (op.b2.unwrap())) {
                         let lname = lv_maps.get(&op.b2.unwrap()).unwrap().to_owned();
                         lv_maps.insert(op.b1.unwrap(), lname);
-                        dbg!(&lv_maps);
                     }
 
                     let code = BPF_ALU64 | BPF_X | BPF_MOV;
@@ -333,10 +330,8 @@ impl Irep {
                     let varname = lv_maps.get(&op.b1.unwrap()).unwrap().to_owned();
                     let symname = self.syms.get(op.b2.unwrap() as usize).unwrap();
                     let symname = symname.to_str()?.to_owned();
-                    dbg!(&varname, &symname);
 
                     lv_maps.remove(&op.b1.unwrap());
-                    dbg!(&lv_maps);
 
                     let n = 0; // TODO: support arity >= 2
                     let off = self.calculate_struct_offset(&args, n, &symname);
@@ -350,7 +345,6 @@ impl Irep {
             }
             i += 1;
         }
-        dbg!(&labels);
 
         for label in labels.into_iter() {
             let bpf = ret.get_mut(label.bpf_src_pc).unwrap();

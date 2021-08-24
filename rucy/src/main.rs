@@ -43,8 +43,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let prog = chunk.prog_def.unwrap();
             let insns = prog.translate(args.into_boxed_slice())?;
 
-            dbg!(&chunk.prog_name);
-
             let chunk = rucy_elfgen::make_mruby_chunk(
                 mruby.clone(),
                 &chunk.section_name,
