@@ -233,6 +233,15 @@ checksum = "b16bd47d9e329435e309c58469fe0791c2d0d1ba96ec0954152a5ae2b04387dc"
 [[package]]
 name = "mrusty"
 version = "3.0.0"
+dependencies = [
+ "cc",
+ "tar",
+ "walkdir",
+]
+
+[[package]]
+name = "mrusty"
+version = "3.0.0"
 source = "git+https://github.com/udzura/mrusty.git#e6e6ab3ca6c626bb04038f87e7ea84b460acca01"
 dependencies = [
  "cc",
@@ -328,7 +337,7 @@ checksum = "f497285884f3fcff424ffc933e56d7cbca511def0c9831a7f9b5f6153e3cc89b"
 name = "rucy"
 version = "0.1.0"
 dependencies = [
- "mrusty",
+ "mrusty 3.0.0 (git+https://github.com/udzura/mrusty.git)",
  "rucy-elfgen",
  "rucy-libelf-sys",
  "rucy-mruby-prelude",
@@ -341,7 +350,7 @@ name = "rucy-elfgen"
 version = "0.1.0"
 dependencies = [
  "errno",
- "mrusty",
+ "mrusty 3.0.0",
  "rucy-libelf-sys",
  "rucy-mruby-prelude",
 ]
@@ -357,7 +366,7 @@ dependencies = [
 name = "rucy-mruby-prelude"
 version = "0.1.0"
 dependencies = [
- "mrusty",
+ "mrusty 3.0.0",
  "rucy-mruby-sys-consts",
 ]
 

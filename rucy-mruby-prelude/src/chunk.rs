@@ -26,9 +26,9 @@ pub struct Chunk {
     pub struct_def: Option<Irep>,
     pub prog_def: Option<Irep>,
 
-    pub section_name: String,
-    pub prog_name: String,
-    pub license: String,
+    pub section_name: CString,
+    pub prog_name: CString,
+    pub license: CString,
 }
 
 #[derive(Debug)]
@@ -53,9 +53,9 @@ impl Chunk {
             root,
             struct_def: None,
             prog_def: None,
-            section_name: "".to_string(),
-            prog_name: "".to_string(),
-            license: "".to_string(),
+            section_name: CString::new("").unwrap(),
+            prog_name: CString::new("").unwrap(),
+            license: CString::new("").unwrap(),
         };
         ret.walk_root_insn();
 
@@ -89,10 +89,10 @@ impl Chunk {
                         let meth = &self.root.syms[nop.b2.unwrap() as usize];
                         match meth.to_str().unwrap() {
                             "license!" => {
-                                self.license = strval.to_str().unwrap().to_owned();
+                                self.license = strval;
                             }
                             "section!" => {
-                                self.section_name = strval.to_str().unwrap().to_owned();
+                                self.section_name = strval;
                             }
                             _ => {
                                 panic!("Invalid DSL: {:?}", meth);
@@ -112,7 +112,7 @@ impl Chunk {
                 }
                 MRB_INSN_OP_DEF => {
                     let strval = self.root.get_string_instance(op.b2.unwrap());
-                    self.prog_name = strval.to_str().unwrap().to_owned();
+                    self.prog_name = strval;
                 }
                 _ => {}
             }

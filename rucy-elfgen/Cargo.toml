@@ -10,5 +10,5 @@ edition = "2018"
 rucy-mruby-prelude = { path = "../rucy-mruby-prelude" }
 rucy-libelf-sys = { path = "../rucy-libelf-sys" }
 errno = "0.2.7"
-mrusty = { git = 'https://github.com/udzura/mrusty.git' }
-# mrusty = { path = '../../mrusty' }
+# mrusty = { git = 'https://github.com/udzura/mrusty.git' }
+mrusty = { path = '../../mrusty' }

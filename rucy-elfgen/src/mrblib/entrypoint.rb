@@ -25,18 +25,18 @@ module Rucy
 
     def build(&blk)
       if @mode == :object
-        @dsl = EntryDSL.new
+        @dsl = Chunk.new
         blk.call(@dsl)
         nil
       end
     end
 
-    def dsl
+    def chunk
       @dsl
     end
   end
 
-  class EntryDSL
+  class Chunk
     def funcname(v=nil)
       @funcname ||= v
     end
@@ -59,6 +59,10 @@ module Rucy
 
     def function(&proc)
       @function ||= proc
+    end
+
+    def data(data=nil)
+      @data ||= data
     end
 
     def parse_args(values)
@@ -84,7 +88,7 @@ module Rucy
 
   class Internal
     def self.register_dsl
-      dsl = Rucy.dsl
+      dsl = Rucy.chunk
 
       ELFFile.define do |elf|
         elf.header do |e|
@@ -108,7 +112,11 @@ module Rucy
             scn.symname(dsl.funcname || "rucy_bpf")
             scn.type SectionType::PROG
 
-            scn.program(&dsl.function)
+            if dsl.data
+              scn.data dsl.data
+            else
+              scn.program(&dsl.function)
+            end
           end
 
           e.section do |scn|
@@ -116,9 +124,6 @@ module Rucy
             scn.type SectionType::SYMTAB
           end
         end # header
-
-        # elf.args_for_func(dsl.args || [])
-
       end # define
     end # method
   end

@@ -13,8 +13,8 @@ pub mod mrb_binary;
 pub mod mrb_eval;
 pub mod mrb_models;
 
-pub use mrb_binary::compile_and_set_prog;
-pub use mrb_eval::eval_elf_dsl;
+pub use mrb_binary::register_chunk;
+pub use mrb_eval::make_mruby_chunk;
 pub use mrb_models::copy_definition_to_rust;
 
 pub mod models {
