@@ -1,0 +1,22 @@
+[package]
+name = "mrusty"
+description = "Forked version of mrusty. See anima-engine/mrusty"
+version = "3.0.0"
+authors = ["Dragoș Tiselice <dragostiselice@gmail.com>", "Robert Krody <krody.robi@gmail.com>", "Uchio Kondo <udzura@udzura.jp>"]
+build = "build.rs"
+exclude = ["src/mruby/get_mruby.sh"]
+repository = "https://github.com/anima-engine/mrusty"
+documentation = "http://anima-engine.github.io/mrusty/"
+keywords = ["mruby", "forked"]
+license = "MPL-2.0"
+
+[build-dependencies]
+cc = "1.0.68"
+tar = ">= 0.4"
+walkdir = "2.3.2"
+
+[features]
+gnu-readline = ["rl-sys"]
+
+[dependencies]
+rl-sys = { version = ">= 0.4.1", optional = true }
