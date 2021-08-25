@@ -49,6 +49,26 @@ def prog(ctx)
   return 0
 end
 ";
+    //compile(mruby.clone(), code)?;
+
+    let code = "
+license! \"GPL\"
+section! \"dev/cgroup\"
+
+class Ctx
+  attr :access_type, :u32
+  attr :major, :u32
+  attr :minor, :u32
+end
+
+def prog(ctx)
+  if ctx.minor == 9
+    return 0
+  else
+    return 1
+  end
+end
+";
     compile(mruby.clone(), code)?;
 
     let code = "
@@ -62,28 +82,33 @@ class Ctx
 end
 
 def prog(ctx)
-  if ctx.major == 1 && ctx.minor == 9
-    return 0
-  else
-    return 1
-  end
+  pid = bpf_get_current_pid_pgid()
+  bpf_trace_printk(\"Access to character device detected. minor: %d\", pid)
+  return 1
 end
 ";
-    compile(mruby.clone(), code)?;
 
-    //     let code = "
-    // class Ctx
-    //   attr :access_type, :u32
-    //   attr :major, :u32
-    //   attr :minor, :u32
-    // end
+    //compile(mruby.clone(), code)?;
 
-    // def prog
-    //   return 1
-    // end
-    // ";
+    let code = "
+license! \"GPL\"
+section! \"dev/cgroup\"
 
-    //     compile(mruby.clone(), code)?;
+class Ctx
+  attr :access_type, :u32
+  attr :major, :u32
+  attr :minor, :u32
+end
+
+def prog(ctx)
+  if ctx.major == 1
+    bpf_trace_printk(\"Access to character device detected. R/W: %d\", ctx.access_type)
+  end
+  return 1
+end
+";
+
+    //compile(mruby.clone(), code)?;
 
     Ok(())
 }

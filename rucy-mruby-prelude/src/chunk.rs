@@ -333,7 +333,12 @@ impl Irep {
 
                     lv_maps.remove(&op.b1.unwrap());
 
-                    let n = 0; // TODO: support arity >= 2
+                    let (n, _) = self
+                        .lv
+                        .iter()
+                        .enumerate()
+                        .find(|(_, name)| (*name).to_str().unwrap() == varname.as_str())
+                        .unwrap();
                     let off = self.calculate_struct_offset(&args, n, &symname);
                     let code = BPF_LDX | BPF_W | BPF_MEM;
                     let bpf = EbpfInsn::new(code, op.b1.unwrap(), op.b1.unwrap(), off, 0);
