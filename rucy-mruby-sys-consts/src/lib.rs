@@ -5,3 +5,5 @@
 include!("../bindgen/bindings.rs");
 
 include!("../bindgen/match.rs");
+
+include!("../bindgen/bpf.rs");

@@ -65,5 +65,29 @@ pub fn opcode_from_u32(insn: MRB_INSN) -> &'static str {
 ",
     )?;
 
+    let bpf = include_str!("include/bpf.h");
+    let re = Regex::new(r"FN\(([a-z0-9_]+)\)").unwrap();
+
+    let mut f = File::create(out_path.join("bpf.rs"))?;
+
+    f.write_all(
+        b"
+pub fn bpf_helper_to_u32(name: &str) -> Option<u32> {
+    match name {
+",
+    )?;
+
+    for (i, cap) in re.captures_iter(bpf).enumerate() {
+        f.write_all(format!("\"bpf_{}\" => Some({}u32),\n", &cap[1], i).as_bytes())?
+    }
+
+    f.write_all(
+        b"
+        _ => None,
+    }
+}
+",
+    )?;
+
     Ok(())
 }
