@@ -108,7 +108,7 @@ def prog(ctx)
 end
 ";
 
-    //compile(mruby.clone(), code)?;
+    compile(mruby.clone(), code)?;
 
     Ok(())
 }

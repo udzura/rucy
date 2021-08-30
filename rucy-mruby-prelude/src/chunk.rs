@@ -40,6 +40,7 @@ pub struct Irep {
     pub syms: Vec<CString>,
     pub insns: Vec<u8>,
     pub ops: Vec<OpCode>,
+    pub nregs: u16,
 }
 
 impl Chunk {
@@ -138,6 +139,8 @@ impl Irep {
             .collect();
         let insns = std::slice::from_raw_parts(irep_.iseq, irep_.ilen as usize).to_vec();
 
+        let nregs = irep_.nregs;
+
         let ops = crate::bytecode::process(&insns);
         Self {
             irep,
@@ -146,6 +149,7 @@ impl Irep {
             syms,
             insns,
             ops,
+            nregs,
         }
     }
 
@@ -202,6 +206,7 @@ impl Irep {
     ) -> Result<Vec<EbpfInsn>, Box<dyn std::error::Error>> {
         let mut ret = vec![];
         let return_reg = 0;
+        let nregs = self.nregs;
         let len = self.ops.len();
         let mut i = 0usize;
 
@@ -325,24 +330,69 @@ impl Irep {
                     let bpf = EbpfInsn::new(code, 0, 0, 0, 0);
                     ret.push(bpf);
                 }
+                MRB_INSN_OP_LOADSELF => { /* TODO: mark self register */ }
+                MRB_INSN_OP_STRING => {
+                    // TODO: generate relocation headers
+                    let code = BPF_LD | BPF_DW;
+                    let bpf = EbpfInsn::new(code, op.b1.unwrap(), 0, 0, 0);
+                    ret.push(bpf);
+                    let bpf = EbpfInsn::zeroed();
+                    ret.push(bpf);
+                }
                 MRB_INSN_OP_SEND => {
-                    // TODO: define and calc strust offset
-                    let varname = lv_maps.get(&op.b1.unwrap()).unwrap().to_owned();
                     let symname = self.syms.get(op.b2.unwrap() as usize).unwrap();
                     let symname = symname.to_str()?.to_owned();
 
-                    lv_maps.remove(&op.b1.unwrap());
+                    if let Some(idx) = bpf_helper_to_u32(&symname) {
+                        let argsize = op.b3.unwrap();
+                        let maxreg = (self.nregs - 2) as u8;
+                        for i in 0..argsize {
+                            // R(maxreg + i + 1) = R(i + 1)
+                            let code = BPF_ALU64 | BPF_X | BPF_MOV;
+                            let dst = maxreg + i + 1;
+                            let src = i + 1;
+                            let bpf = EbpfInsn::new(code, dst, src, 0, 0);
+                            ret.push(bpf);
+                        }
 
-                    let (n, _) = self
-                        .lv
-                        .iter()
-                        .enumerate()
-                        .find(|(_, name)| (*name).to_str().unwrap() == varname.as_str())
-                        .unwrap();
-                    let off = self.calculate_struct_offset(&args, n, &symname);
-                    let code = BPF_LDX | BPF_W | BPF_MEM;
-                    let bpf = EbpfInsn::new(code, op.b1.unwrap(), op.b1.unwrap(), off, 0);
-                    ret.push(bpf);
+                        for i in 0..argsize {
+                            // R(i + 1) = R(b1 + i + 1)
+                            let code = BPF_ALU64 | BPF_X | BPF_MOV;
+                            let dst = i + 1;
+                            let src = op.b1.unwrap() + i + 1;
+                            let bpf = EbpfInsn::new(code, dst, src, 0, 0);
+                            ret.push(bpf);
+                        }
+
+                        let code = BPF_JMP | BPF_CALL;
+                        let imm = idx as i32;
+                        let bpf = EbpfInsn::new(code, 0, 0, 0, imm);
+                        ret.push(bpf);
+
+                        for i in 0..argsize {
+                            // R(i + 1) = R(maxreg + i + 1)
+                            let code = BPF_ALU64 | BPF_X | BPF_MOV;
+                            let dst = i + 1;
+                            let src = maxreg + i + 1;
+                            let bpf = EbpfInsn::new(code, dst, src, 0, 0);
+                            ret.push(bpf);
+                        }
+                    } else {
+                        let varname = lv_maps.get(&op.b1.unwrap()).unwrap().to_owned();
+
+                        lv_maps.remove(&op.b1.unwrap());
+
+                        let (n, _) = self
+                            .lv
+                            .iter()
+                            .enumerate()
+                            .find(|(_, name)| (*name).to_str().unwrap() == varname.as_str())
+                            .unwrap();
+                        let off = self.calculate_struct_offset(&args, n, &symname);
+                        let code = BPF_LDX | BPF_W | BPF_MEM;
+                        let bpf = EbpfInsn::new(code, op.b1.unwrap(), op.b1.unwrap(), off, 0);
+                        ret.push(bpf);
+                    }
                 }
                 _ => {
                     unimplemented!("Not yet supported");

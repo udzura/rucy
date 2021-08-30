@@ -118,6 +118,15 @@ impl EbpfInsn {
         }
     }
 
+    pub fn zeroed() -> Self {
+        Self {
+            code: 0,
+            regs: 0,
+            off: 0,
+            imm: 0,
+        }
+    }
+
     pub fn as_bin(&self) -> &[u8] {
         unsafe {
             let bptr = self as *const Self as *const u8;
