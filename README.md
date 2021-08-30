@@ -2,8 +2,9 @@
 
 Rucy is a Ruby Compiler. It only supports BPF object target for now.
 
+<img src="docs/rucy-demo.gif" width="640" />
 
-## Usage-to-be
+## Usage
 
 ```ruby
 license! "GPL"
