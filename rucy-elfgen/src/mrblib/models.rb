@@ -101,7 +101,9 @@ module Rucy
     STRTAB = 1
     PROG = 2
     LICENSE = 3
-    SYMTAB = 4
+    STRING = 4
+    REL = 5
+    SYMTAB = 6
   end
 
   ET_NONE = 0

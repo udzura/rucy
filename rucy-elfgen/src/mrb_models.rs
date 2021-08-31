@@ -84,6 +84,57 @@ pub fn copy_definition_to_rust(mruby: &MrubyType) -> Result<Elf, Box<dyn std::er
                 };
                 symbols.push(sym);
             }
+            SectionType::String => {
+                shdr.name = scn.get_var("@name").unwrap().to_str()?.to_owned();
+                shdr.r#type = SHT_PROGBITS;
+                shdr.flags = (SHF_ALLOC | SHF_MERGE | SHF_STRINGS) as u64;
+                shdr.align = 1;
+                shdr.link = 0;
+                shdr.info = 0;
+
+                let data_bin = scn.get_var("@data").unwrap().to_bytes()?.to_owned();
+                let len = data_bin.len() as u64;
+                data = SectionHeaderData::Data(data_bin.to_vec());
+
+                let sym = Symbol {
+                    name: scn.get_var("@symname").unwrap().to_str()?.to_owned(),
+                    shndx: (i + 1) as u16,
+                    info: ((STB_LOCAL << 4) | STT_OBJECT) as u8,
+                    value: 0,
+                    size: len,
+                };
+                symbols.insert(0, sym); // unshift local obj
+            }
+            SectionType::Rel => {
+                shdr.name = scn.get_var("@name").unwrap().to_str()?.to_owned();
+                shdr.r#type = SHT_REL;
+                shdr.flags = SHF_INFO_LINK as u64;
+                shdr.align = 8;
+                // see https://docs.oracle.com/cd/E23824_01/html/819-0690/chapter6-94076.html#scrolltoc
+
+                // The section header index of the associated symbol table
+                shdr.link = 6;
+                // If the sh_flags member contains the SHF_INFO_LINK flag,
+                // the section header index of the section to
+                // which the relocation applies, otherwise 0.
+                // e.g. dev/cgroup section index
+                shdr.info = 3;
+
+                let (sym, _) = symbols
+                    .iter()
+                    .enumerate()
+                    .find(|(_, sym)| sym.info == ((STB_LOCAL << 4) | STT_OBJECT) as u8)
+                    .unwrap();
+                dbg!(sym);
+
+                let rel = Relocation {
+                    offset: 0x28, // calc
+                    r#type: 1,    // R_BPF_64_64
+                    sym: (sym + 1) as u32,
+                };
+                let rels = vec![rel];
+                data = SectionHeaderData::Rel(rels);
+            }
             SectionType::SymTab => {
                 shdr.name = scn.get_var("@name").unwrap().to_str()?.to_owned();
                 shdr.r#type = SHT_SYMTAB;

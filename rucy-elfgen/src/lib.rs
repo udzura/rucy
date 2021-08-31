@@ -93,6 +93,7 @@ pub mod models {
     pub enum SectionHeaderData {
         Unset,
         Data(Vec<u8>),
+        Rel(Vec<Relocation>),
         SymTab(Vec<Symbol>),
     }
 
@@ -103,6 +104,13 @@ pub mod models {
         pub shndx: u16,
         pub value: u64,
         pub size: u64,
+    }
+
+    #[derive(Debug, Clone)]
+    pub struct Relocation {
+        pub offset: u64,
+        pub r#type: u8,
+        pub sym: u32,
     }
 
     #[derive(Debug, Clone, Default)]
@@ -119,6 +127,8 @@ pub mod models {
         StrTab,
         Prog,
         License,
+        String,
+        Rel,
         SymTab,
     }
 
@@ -129,7 +139,9 @@ pub mod models {
                 1 => Self::StrTab,
                 2 => Self::Prog,
                 3 => Self::License,
-                4 => Self::SymTab,
+                4 => Self::String,
+                5 => Self::Rel,
+                6 => Self::SymTab,
                 _ => panic!("Unsupported: {}", from),
             }
         }
@@ -201,7 +213,7 @@ pub fn generate(
                     (*sh).sh_size = len;
                     (*sh).sh_entsize = 0;
                 }
-                SectionType::License | SectionType::Prog => {
+                SectionType::License | SectionType::Prog | SectionType::String => {
                     if let models::SectionHeaderData::Data(data) = &scn.data {
                         let mut buf = vec![0u8; data.len()].into_boxed_slice();
                         buf.copy_from_slice(data);
@@ -214,6 +226,34 @@ pub fn generate(
                         (*sh).sh_entsize = 0;
                     } else {
                         panic!("invalid data: {:?}", scn.data);
+                    }
+                }
+                SectionType::Rel => {
+                    if let models::SectionHeaderData::Rel(data) = &scn.data {
+                        let entsize = ::std::mem::size_of::<Elf64_Rel>();
+                        let mut buf = vec![
+                            Elf64_Rel {
+                                r_info: 0,
+                                r_offset: 0,
+                            };
+                            data.len()
+                        ]
+                        .into_boxed_slice();
+
+                        for (i, rel) in data.iter().enumerate() {
+                            buf[i].r_offset = rel.offset;
+                            buf[i].r_info = ((rel.sym as u64) << 32) | (rel.r#type as u64);
+                        }
+
+                        let len = (entsize * data.len()) as u64;
+                        (*data_).d_buf = Box::into_raw(buf) as *mut c_void;
+                        (*data_).d_size = len;
+                        (*data_).d_align = scn.header.align;
+
+                        (*sh).sh_size = len;
+                        (*sh).sh_link = scn.header.link;
+                        (*sh).sh_info = scn.header.info;
+                        (*sh).sh_entsize = entsize as u64;
                     }
                 }
                 SectionType::SymTab => {
