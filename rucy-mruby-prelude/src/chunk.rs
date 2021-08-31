@@ -332,11 +332,60 @@ impl Irep {
                 }
                 MRB_INSN_OP_LOADSELF => { /* TODO: mark self register */ }
                 MRB_INSN_OP_STRING => {
-                    // TODO: generate relocation headers
-                    let code = BPF_LD | BPF_DW;
-                    let bpf = EbpfInsn::new(code, op.b1.unwrap(), 0, 0, 0);
+                    // generate bytearray
+                    let mut chars = self.get_string_instance(op.b2.unwrap());
+                    let mut padlen = chars.as_bytes().len() % 8;
+                    if padlen != 0 {
+                        padlen = 8 - padlen;
+                    }
+                    let mut chars = chars.as_bytes().to_vec();
+                    let len = chars.len();
+                    chars.resize_with(len + padlen, || 0u8);
+
+                    let len = chars.len();
+                    let mut i = 0;
+                    let mut charreps: Vec<u64> = vec![];
+                    while i < len {
+                        let mut charrep = 0u64;
+                        for j in 0..8 {
+                            charrep = charrep | (chars[i] as u64) << (j * 8);
+                            i += 1;
+                        }
+                        charreps.push(charrep);
+                    }
+                    dbg!(&charreps);
+
+                    let mut memoff = 0i16;
+                    for crep in charreps.iter().rev() {
+                        let code = BPF_LD | BPF_DW;
+                        let imm = (*crep) as i64;
+                        // r(B1) = imm as ll
+                        let lddw = EbpfInsn::new64(code, op.b1.unwrap(), 0, 0, imm);
+                        ret.push(lddw.0);
+                        ret.push(lddw.1);
+
+                        memoff -= 8;
+                        let off = memoff;
+                        let code = BPF_STX | BPF_DW | BPF_MEM;
+                        // frame pointer
+                        let dst_reg = 10;
+                        // *(u64 *)(r10 - memoff) = r(B1)
+                        let bpf = EbpfInsn::new(code, dst_reg, op.b1.unwrap(), off, 0);
+                        ret.push(bpf);
+                    }
+                    // r(B1) = r10
+                    let code = BPF_ALU64 | BPF_X | BPF_MOV;
+                    let dst = op.b1.unwrap();
+                    let src = 10;
+                    let bpf = EbpfInsn::new(code, dst, src, 0, 0);
                     ret.push(bpf);
-                    let bpf = EbpfInsn::zeroed();
+
+                    // r(B1) -= current_memoff
+                    let code = BPF_ALU64 | BPF_K | BPF_ADD;
+                    let dst = op.b1.unwrap();
+                    let src = 0;
+                    let off = memoff as i32;
+                    let bpf = EbpfInsn::new(code, dst, src, 0, off);
                     ret.push(bpf);
                 }
                 MRB_INSN_OP_SEND => {
@@ -346,13 +395,18 @@ impl Irep {
                     if let Some(idx) = bpf_helper_to_u32(&symname) {
                         let argsize = op.b3.unwrap();
                         let maxreg = (self.nregs - 2) as u8;
+                        let mut dst = maxreg + 1;
                         for i in 0..argsize {
+                            // Skip becatse R2 is not used on mruby..
+                            if i == 1 {
+                                continue;
+                            };
                             // R(maxreg + i + 1) = R(i + 1)
                             let code = BPF_ALU64 | BPF_X | BPF_MOV;
-                            let dst = maxreg + i + 1;
                             let src = i + 1;
                             let bpf = EbpfInsn::new(code, dst, src, 0, 0);
                             ret.push(bpf);
+                            dst += 1;
                         }
 
                         for i in 0..argsize {
@@ -369,13 +423,17 @@ impl Irep {
                         let bpf = EbpfInsn::new(code, 0, 0, 0, imm);
                         ret.push(bpf);
 
+                        let mut src = maxreg + 1;
                         for i in 0..argsize {
+                            if i == 1 {
+                                continue;
+                            };
                             // R(i + 1) = R(maxreg + i + 1)
                             let code = BPF_ALU64 | BPF_X | BPF_MOV;
                             let dst = i + 1;
-                            let src = maxreg + i + 1;
                             let bpf = EbpfInsn::new(code, dst, src, 0, 0);
                             ret.push(bpf);
+                            src += 1;
                         }
                     } else {
                         let varname = lv_maps.get(&op.b1.unwrap()).unwrap().to_owned();

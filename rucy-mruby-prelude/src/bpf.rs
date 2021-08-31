@@ -118,6 +118,26 @@ impl EbpfInsn {
         }
     }
 
+    pub fn new64(code: u8, dst_reg: u8, src_reg: u8, off: i16, imm: i64) -> (Self, Self) {
+        let regs = (src_reg << 4) | dst_reg;
+        let imma = (((imm << 32) & ((2_i64.pow(32) - 1) << 32)) >> 32) as i32;
+        let immb = ((imm >> 32) & (2_i64.pow(32) - 1)) as i32;
+        (
+            Self {
+                code,
+                regs,
+                off,
+                imm: imma,
+            },
+            Self {
+                code: 0,
+                regs: 0,
+                off: 0,
+                imm: immb,
+            },
+        )
+    }
+
     pub fn zeroed() -> Self {
         Self {
             code: 0,

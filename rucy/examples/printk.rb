@@ -9,7 +9,7 @@ end
 
 def prog(ctx)
   if ctx.major == 1
-    bpf_trace_printk("Access to character device detected. R/W: %d", ctx.access_type)
+    bpf_trace_printk("Access to character device detected. R/W: %d\n", 46, ctx.access_type)
   end
   return 1
 end
