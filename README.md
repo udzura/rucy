@@ -62,6 +62,10 @@ Disassembly of section cgroup/dev:
 
 * https://twitter.com/i/status/1430046852699680769
 
+## Example with mruby+libbpf use
+
+- See https://github.com/udzura/mruby-rubykaigi-rucy-sample
+
 ## TODO
 
 * Integrate into libbpf
